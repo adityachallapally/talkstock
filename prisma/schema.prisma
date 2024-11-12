@@ -1,0 +1,78 @@
+// schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // Uses connection pooling
+  url = env("POSTGRES_PRISMA_URL")
+  // Uses direct connection, ⚠️ make sure to keep this to `POSTGRES_URL_NON_POOLING`
+  // or you'll have dangling databases from migrations
+  directUrl = env("POSTGRES_URL_NON_POOLING")
+}
+
+model User {
+  id        String    @id @default(cuid())
+  name      String?
+  email     String    @unique
+  image     String?
+  googleId  String?   @unique
+  accounts  Account[]
+}
+
+model Account {
+  id                 String    @id @default(cuid())
+  userId             String
+  platform           String    // 'YouTube' or 'TikTok'
+  accountId          String?   // This can be null for YouTube, as we'll use channelId instead
+  accessToken        String
+  refreshToken       String?
+  accessTokenExpires DateTime?
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channels           Channel[] // Only used for YouTube
+  series         Series[]  // Add this line
+  @@unique([userId, platform])
+}
+
+model Channel {
+  id        String  @id @default(cuid())
+  accountId String
+  channelId String  // YouTube channel ID
+  title     String
+  thumbnail String?
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, channelId])
+}
+
+model Series {
+  id             Int       @id @default(autoincrement())
+  accountId      String    // Changed to String
+  account        Account   @relation(fields: [accountId], references: [id])
+  topic          String
+  voice          String
+  frequency      String    // e.g., "daily", "weekly", "monthly"
+  nextPostDate   DateTime?
+  lastPostedDate DateTime?
+  createdAt      DateTime  @default(now())
+  videos         Video[]
+}
+
+model Video {
+  id               Int      @id @default(autoincrement())
+  script           String
+  audioSrc         String  
+  imageUrls       String[]
+  transcriptionSrc String   // Added this field
+  title            String
+  caption          String
+  videoLink        String?  // Made optional
+  seriesId         Int?
+  series           Series?  @relation(fields: [seriesId], references: [id])
+  createdAt        DateTime @default(now())
+  postedAt         DateTime?
+  postStatus       String   @default("pending") // "pending", "posted", "failed"
+  durationInFrames Int?
+}
