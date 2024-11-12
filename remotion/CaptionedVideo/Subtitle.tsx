@@ -26,12 +26,12 @@ const Subtitle: React.FC<{ text: string }> = ({ text }) => {
     durationInFrames: 5,
   });
 
-  // Style to position the subtitle 2/3 down the screen
+  // Style to position the subtitle 80% down the screen
   const subtitleStyle: React.CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'flex-end',
-    height: '66.67%', // This positions it 2/3 down the screen
+    height: '90%', // This positions it 80% down the screen
     width: '100%',
     alignItems: 'center',
     paddingBottom: '20px', // Add some padding at the bottom

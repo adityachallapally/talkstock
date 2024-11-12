@@ -1,0 +1,472 @@
+{
+  "systeminfo": "AVX = 1 | AVX2 = 1 | AVX512 = 0 | FMA = 1 | NEON = 0 | ARM_FMA = 0 | METAL = 0 | F16C = 1 | FP16_VA = 0 | WASM_SIMD = 0 | BLAS = 0 | SSE3 = 1 | SSSE3 = 1 | VSX = 0 | CUDA = 0 | COREML = 0 | OPENVINO = 0",
+  "model": {
+    "type": "medium",
+    "multilingual": false,
+    "vocab": 51864,
+    "audio": {
+      "ctx": 1500,
+      "state": 1024,
+      "head": 16,
+      "layer": 24
+    },
+    "text": {
+      "ctx": 448,
+      "state": 1024,
+      "head": 16,
+      "layer": 24
+    },
+    "mels": 80,
+    "ftype": 1
+  },
+  "params": {
+    "model": "/home/avasanthc/video-creation/remotion-craftclips/whisper.cpp/ggml-medium.en.bin",
+    "language": "en",
+    "translate": false
+  },
+  "result": {
+    "language": "en"
+  },
+  "transcription": [
+    {
+      "text": "Everybody",
+      "startInSeconds": 0.48
+    },
+    {
+      "text": "thinks",
+      "startInSeconds": 0.86
+    },
+    {
+      "text": "that",
+      "startInSeconds": 1.1
+    },
+    {
+      "text": "wrappers,",
+      "startInSeconds": 1.3
+    },
+    {
+      "text": "apps",
+      "startInSeconds": 2.3
+    },
+    {
+      "text": "that",
+      "startInSeconds": 2.6
+    },
+    {
+      "text": "take",
+      "startInSeconds": 2.9
+    },
+    {
+      "text": "generic large",
+      "startInSeconds": 3.34
+    },
+    {
+      "text": "language",
+      "startInSeconds": 3.8
+    },
+    {
+      "text": "models",
+      "startInSeconds": 4.12
+    },
+    {
+      "text": "and put",
+      "startInSeconds": 4.36
+    },
+    {
+      "text": "a UI",
+      "startInSeconds": 4.68
+    },
+    {
+      "text": "on top",
+      "startInSeconds": 5.24
+    },
+    {
+      "text": "of them",
+      "startInSeconds": 5.54
+    },
+    {
+      "text": "to customize",
+      "startInSeconds": 5.9
+    },
+    {
+      "text": "it for",
+      "startInSeconds": 6.68
+    },
+    {
+      "text": "specific",
+      "startInSeconds": 7.26
+    },
+    {
+      "text": "use cases",
+      "startInSeconds": 7.5
+    },
+    {
+      "text": "or audiences,",
+      "startInSeconds": 7.92
+    },
+    {
+      "text": "won't make",
+      "startInSeconds": 8.94
+    },
+    {
+      "text": "much",
+      "startInSeconds": 9.42
+    },
+    {
+      "text": "money,",
+      "startInSeconds": 9.7
+    },
+    {
+      "text": "like",
+      "startInSeconds": 10
+    },
+    {
+      "text": "liner",
+      "startInSeconds": 10.36
+    },
+    {
+      "text": "for search.",
+      "startInSeconds": 10.64
+    },
+    {
+      "text": "They",
+      "startInSeconds": 12.26
+    },
+    {
+      "text": "think",
+      "startInSeconds": 12.5
+    },
+    {
+      "text": "that they'll",
+      "startInSeconds": 12.72
+    },
+    {
+      "text": "get",
+      "startInSeconds": 13.06
+    },
+    {
+      "text": "copied",
+      "startInSeconds": 13.46
+    },
+    {
+      "text": "by model",
+      "startInSeconds": 13.74
+    },
+    {
+      "text": "makers",
+      "startInSeconds": 14.4
+    },
+    {
+      "text": "or",
+      "startInSeconds": 15.28
+    },
+    {
+      "text": "by",
+      "startInSeconds": 15.8
+    },
+    {
+      "text": "clones",
+      "startInSeconds": 16.32
+    },
+    {
+      "text": "and their",
+      "startInSeconds": 16.48
+    },
+    {
+      "text": "profit",
+      "startInSeconds": 16.94
+    },
+    {
+      "text": "margins",
+      "startInSeconds": 17.24
+    },
+    {
+      "text": "will",
+      "startInSeconds": 17.46
+    },
+    {
+      "text": "go away",
+      "startInSeconds": 17.66
+    },
+    {
+      "text": "and they're",
+      "startInSeconds": 18.7
+    },
+    {
+      "text": "all",
+      "startInSeconds": 19.56
+    },
+    {
+      "text": "wrong.",
+      "startInSeconds": 20.42
+    },
+    {
+      "text": "Research",
+      "startInSeconds": 21.42
+    },
+    {
+      "text": "from our",
+      "startInSeconds": 21.64
+    },
+    {
+      "text": "course",
+      "startInSeconds": 22.14
+    },
+    {
+      "text": "shows",
+      "startInSeconds": 22.52
+    },
+    {
+      "text": "that",
+      "startInSeconds": 23.08
+    },
+    {
+      "text": "these",
+      "startInSeconds": 23.7
+    },
+    {
+      "text": "wrappers",
+      "startInSeconds": 23.96
+    },
+    {
+      "text": "are actually",
+      "startInSeconds": 24.3
+    },
+    {
+      "text": "quite",
+      "startInSeconds": 25
+    },
+    {
+      "text": "profitable",
+      "startInSeconds": 25.56
+    },
+    {
+      "text": "and are",
+      "startInSeconds": 25.84
+    },
+    {
+      "text": "growing",
+      "startInSeconds": 26.24
+    },
+    {
+      "text": "significantly,",
+      "startInSeconds": 26.82
+    },
+    {
+      "text": "usually",
+      "startInSeconds": 27.18
+    },
+    {
+      "text": "at least",
+      "startInSeconds": 27.36
+    },
+    {
+      "text": "at a",
+      "startInSeconds": 27.74
+    },
+    {
+      "text": "20%",
+      "startInSeconds": 28.08
+    },
+    {
+      "text": "profit",
+      "startInSeconds": 28.54
+    },
+    {
+      "text": "margin",
+      "startInSeconds": 29
+    },
+    {
+      "text": "and",
+      "startInSeconds": 29.68
+    },
+    {
+      "text": "a two",
+      "startInSeconds": 29.9
+    },
+    {
+      "text": "to three",
+      "startInSeconds": 30.28
+    },
+    {
+      "text": "times",
+      "startInSeconds": 30.72
+    },
+    {
+      "text": "year",
+      "startInSeconds": 30.92
+    },
+    {
+      "text": "over",
+      "startInSeconds": 31.08
+    },
+    {
+      "text": "year",
+      "startInSeconds": 31.28
+    },
+    {
+      "text": "growth",
+      "startInSeconds": 31.66
+    },
+    {
+      "text": "and",
+      "startInSeconds": 32.42
+    },
+    {
+      "text": "this makes",
+      "startInSeconds": 32.64
+    },
+    {
+      "text": "sense",
+      "startInSeconds": 33.44
+    },
+    {
+      "text": "by the",
+      "startInSeconds": 33.66
+    },
+    {
+      "text": "way.",
+      "startInSeconds": 34.04
+    },
+    {
+      "text": "Over",
+      "startInSeconds": 34.8
+    },
+    {
+      "text": "90%",
+      "startInSeconds": 35.5
+    },
+    {
+      "text": "of the",
+      "startInSeconds": 36.38
+    },
+    {
+      "text": "world's",
+      "startInSeconds": 36.62
+    },
+    {
+      "text": "population",
+      "startInSeconds": 37.32
+    },
+    {
+      "text": "don't",
+      "startInSeconds": 38.16
+    },
+    {
+      "text": "use chatgpt",
+      "startInSeconds": 38.44
+    },
+    {
+      "text": "or anything",
+      "startInSeconds": 39.16
+    },
+    {
+      "text": "similar",
+      "startInSeconds": 39.82
+    },
+    {
+      "text": "on even",
+      "startInSeconds": 40.42
+    },
+    {
+      "text": "a somewhat",
+      "startInSeconds": 40.98
+    },
+    {
+      "text": "regular",
+      "startInSeconds": 41.66
+    },
+    {
+      "text": "basis",
+      "startInSeconds": 41.98
+    },
+    {
+      "text": "if they've",
+      "startInSeconds": 42.3
+    },
+    {
+      "text": "used",
+      "startInSeconds": 42.7
+    },
+    {
+      "text": "it at",
+      "startInSeconds": 42.86
+    },
+    {
+      "text": "all and",
+      "startInSeconds": 43.4
+    },
+    {
+      "text": "so making",
+      "startInSeconds": 44.4
+    },
+    {
+      "text": "Gen",
+      "startInSeconds": 45.4
+    },
+    {
+      "text": "AI accessible",
+      "startInSeconds": 45.5
+    },
+    {
+      "text": "to",
+      "startInSeconds": 46.9
+    },
+    {
+      "text": "this",
+      "startInSeconds": 47.1
+    },
+    {
+      "text": "market",
+      "startInSeconds": 47.46
+    },
+    {
+      "text": "is a wide",
+      "startInSeconds": 47.96
+    },
+    {
+      "text": "open",
+      "startInSeconds": 48.82
+    },
+    {
+      "text": "opportunity",
+      "startInSeconds": 49.46
+    },
+    {
+      "text": "and the",
+      "startInSeconds": 49.76
+    },
+    {
+      "text": "few companies",
+      "startInSeconds": 50.2
+    },
+    {
+      "text": "who",
+      "startInSeconds": 50.74
+    },
+    {
+      "text": "are targeting",
+      "startInSeconds": 50.84
+    },
+    {
+      "text": "this are making",
+      "startInSeconds": 51.54
+    },
+    {
+      "text": "a",
+      "startInSeconds": 52.64
+    },
+    {
+      "text": "killing",
+      "startInSeconds": 53.04
+    },
+    {
+      "text": "doing",
+      "startInSeconds": 53.4
+    },
+    {
+      "text": "it.",
+      "startInSeconds": 53.66
+    }
+  ]
+}
