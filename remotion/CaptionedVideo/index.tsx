@@ -316,7 +316,6 @@ export const CaptionedVideo: React.FC<{
 				</Sequence>
 			))}
 
-			{/* Keep existing subtitles code - they'll display on top */}
 			{subtitles.map((subtitle, index) => {
 				const nextSubtitle = subtitles[index + 1] ?? null;
 				const subtitleStartFrame = subtitle.startInSeconds * fps;
@@ -338,7 +337,6 @@ export const CaptionedVideo: React.FC<{
 					</Sequence>
 				);
 			})}
-			{/* {getFileExists(subtitlesFile) ? null : <NoCaptionFile />} */}
 		</AbsoluteFill>
 	);
 };
