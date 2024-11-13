@@ -20,15 +20,22 @@ import generateOverlays from '@/lib/getoverlays';
 
 const VideoCreatorPage: React.FC<VideoCreatorPageProps> = () => {
   const [overlays, setOverlays] = useState<OverlayConfig[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchOverlays = async () => {
-      const overlayer = await generateOverlays();
+      setIsLoading(true);
+      const overlayer = await generateOverlays('https://hx7mp5wayo6ybdwl.public.blob.vercel-storage.com/stanford_video-lGCdCm0OcnuLhBPHM9f50eS4zyqiV0.json');
       setOverlays(overlayer);
+      setIsLoading(false);
     };
 
     fetchOverlays();
   }, []);
+
+  if (isLoading) {
+    return <div>Loading overlays...</div>;
+  }
 
   return (
     <div>
@@ -44,7 +51,7 @@ const VideoCreatorPage: React.FC<VideoCreatorPageProps> = () => {
           loop
           inputProps={{
             src: staticFile('stanford_video.mp4'),
-            overlays: overlays // Use the state variable
+            overlays: overlays
           }}
         />
       </div>

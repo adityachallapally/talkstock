@@ -308,7 +308,7 @@ export const CaptionedVideo: React.FC<{
 
 			{overlays.map((overlay, index) => (
 				<Sequence
-					key={index}
+					key={`overlay-${index}`}
 					from={overlay.startFrame}
 					durationInFrames={overlay.duration}
 				>
@@ -330,6 +330,7 @@ export const CaptionedVideo: React.FC<{
 
 				return (
 					<Sequence
+						key={`subtitle-${index}`}
 						from={subtitleStartFrame}
 						durationInFrames={durationInFrames}
 					>
