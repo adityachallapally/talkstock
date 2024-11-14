@@ -18,6 +18,9 @@ import Subtitle from './Subtitle';
 import {getVideoMetadata} from '@remotion/media-utils';
 import {loadFont, loadMontserrat} from '../load-font';
 import {NoCaptionFile} from './NoCaptionFile';
+import { TitleBullets } from './TitleBullets';
+import { TemplateType } from '@/types/constants';
+import { OverlayConfig } from '@/types/constants';
 
 
 export type SubtitleProp = {
@@ -49,8 +52,7 @@ const getFileExists = (file: string) => {
 	return Boolean(fileExists);
 };
 
-// Add this new component above the CaptionedVideo component
-const TypewriterText: React.FC<{
+export const TypewriterText: React.FC<{
 	text: string;
 	delay?: number;
 }> = ({text, delay = 0}) => {
@@ -91,7 +93,7 @@ const TypewriterText: React.FC<{
 	);
 };
 
-const BoxReveal: React.FC<{children: React.ReactNode}> = ({children}) => {
+export const BoxReveal: React.FC<{children: React.ReactNode}> = ({children}) => {
     const frame = useCurrentFrame();
     const {fps} = useVideoConfig();
     
@@ -135,82 +137,16 @@ type OverlaySection = {
 };
 
 // New reusable component for overlay sections
-const OverlaySection: React.FC<OverlaySection> = ({
-  title,
-  items,
-  videoSrc,
-}) => {
-  return (
-    <AbsoluteFill>
-      <OffthreadVideo
-        src={videoSrc}
-        style={{
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover',
-          filter: 'blur(4px) brightness(0.8)',
-        }}
-      />
-      
-      <AbsoluteFill
-        style={{
-          backgroundColor: 'rgba(0, 0, 0, 0.25)',
-          position: 'absolute',
-        }}
-      />
-
-      <AbsoluteFill
-        style={{
-          background: `repeating-linear-gradient(
-            180deg,
-            transparent,
-            transparent 3px,
-            rgba(255, 255, 255, 0.01) 4px,
-            rgba(255, 255, 255, 0.03) 4.5px,
-            rgba(255, 255, 255, 0.1) 5px,
-            rgba(255, 255, 255, 0.1) 29px,
-            rgba(255, 255, 255, 0.03) 29.5px,
-            rgba(255, 255, 255, 0.01) 30px,
-            transparent 30px
-          )`,
-          position: 'absolute',
-        }}
-      />
-
-      <AbsoluteFill
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center',
-          padding: '40px',
-        }}
-      >
-        <BoxReveal>
-          <TitleAnimation title={title} />
-          <div style={{
-            color: 'white',
-            fontSize: '67px',
-            fontFamily: 'Montserrat',
-            fontWeight: 500,
-            lineHeight: '1.4',
-            textAlign: 'left',
-            textShadow: '2px 2px 8px rgba(0,0,0,0.8)',
-          }}>
-            {items.map((item, index) => (
-              <div key={index} style={{ marginBottom: index === items.length - 1 ? 0 : '24px' }}>
-                <TypewriterText text={item.text} delay={item.delay} />
-              </div>
-            ))}
-          </div>
-        </BoxReveal>
-      </AbsoluteFill>
-    </AbsoluteFill>
-  );
+const OverlaySection: React.FC<OverlayConfig> = (props) => {
+  switch (props.type) {
+    case TemplateType.TITLE_BULLETS:
+    default:
+      return <TitleBullets {...props} />;
+  }
 };
 
 // Update TitleAnimation to accept title prop
-const TitleAnimation: React.FC<{title: string}> = ({title}) => {
+export const TitleAnimation: React.FC<{title: string}> = ({title}) => {
     const frame = useCurrentFrame();
     const {fps} = useVideoConfig();
     
@@ -243,6 +179,7 @@ const TitleAnimation: React.FC<{title: string}> = ({title}) => {
                 fontWeight: 600,
                 margin: 0,
                 letterSpacing: '2px',
+                textShadow: '3px 3px 6px rgba(0,0,0,0.4), 0px 0px 10px rgba(0,0,0,0.2)'
             }}>
                 {title}
             </h1>
@@ -250,16 +187,6 @@ const TitleAnimation: React.FC<{title: string}> = ({title}) => {
     );
 };
 
-export type OverlayConfig = {
-	startFrame: number;
-	duration: number;
-	title: string;
-	videoSrc: string;
-	items: {
-		text: string;
-		delay: number;
-	}[];
-};
 
 export const CaptionedVideo: React.FC<{
 	src: string;
