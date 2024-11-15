@@ -1,9 +1,9 @@
 import { AbsoluteFill, OffthreadVideo } from 'remotion';
-import { TitleAnimation, TypewriterText, BoxReveal } from './index';
+import { TypewriterText } from './index';
 import { OverlayConfig } from '@/types/constants';
 import { overlayStyles } from './styles';
 
-export const TitleBullets: React.FC<OverlayConfig> = ({
+export const NumberHighlight: React.FC<OverlayConfig> = ({
   title,
   items,
   videoSrc,
@@ -16,17 +16,22 @@ export const TitleBullets: React.FC<OverlayConfig> = ({
       <AbsoluteFill style={overlayStyles.darkOverlay} />
       <AbsoluteFill style={overlayStyles.scanlines} />
       <AbsoluteFill style={overlayStyles.content}>
-        <BoxReveal>
-          <TitleAnimation title={title} />
+        <div style={overlayStyles.container}>
+          <div style={{ ...overlayStyles.title, color: '#ff4444' }}>
+            {title}
+          </div>
           <div style={overlayStyles.text}>
             {items.map((item, index) => (
               <div key={index} style={{ marginBottom: '24px' }}>
-                <TypewriterText text={item.text} delay={item.delay} />
+                <TypewriterText 
+                  text={`${index + 1}. ${item.text}`} 
+                  delay={item.delay} 
+                />
               </div>
             ))}
           </div>
-        </BoxReveal>
+        </div>
       </AbsoluteFill>
     </AbsoluteFill>
   );
-};
+}; 

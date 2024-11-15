@@ -21,6 +21,8 @@ import {NoCaptionFile} from './NoCaptionFile';
 import { TitleBullets } from './TitleBullets';
 import { TemplateType } from '@/types/constants';
 import { OverlayConfig } from '@/types/constants';
+import { TitleSwap } from './TitleSwap';
+import { NumberHighlight } from './NumberHighlight';
 
 
 export type SubtitleProp = {
@@ -140,6 +142,11 @@ type OverlaySection = {
 const OverlaySection: React.FC<OverlayConfig> = (props) => {
   switch (props.type) {
     case TemplateType.TITLE_BULLETS:
+      return <TitleBullets {...props} />;
+    case TemplateType.TITLE_SWAP:
+      return <TitleSwap {...props} />;
+    case TemplateType.NUMBER_HIGHLIGHT:
+      return <NumberHighlight {...props} />;
     default:
       return <TitleBullets {...props} />;
   }

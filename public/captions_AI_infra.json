@@ -1,0 +1,135 @@
+[
+  {
+    "text": "Research from our course highlights",
+    "startMs": 0,
+    "endMs": 1720,
+    "confidence": 1,
+    "timestampMs": 860
+  },
+  {
+    "text": "that most organizations working on GenAI",
+    "startMs": 1720,
+    "endMs": 4200,
+    "confidence": 1,
+    "timestampMs": 2960
+  },
+  {
+    "text": "were building this incredibly complicated infrastructure",
+    "startMs": 4200,
+    "endMs": 7320,
+    "confidence": 1,
+    "timestampMs": 5760
+  },
+  {
+    "text": "setups for their GenAI workloads.",
+    "startMs": 7320,
+    "endMs": 9440,
+    "confidence": 1,
+    "timestampMs": 8379.999999999998
+  },
+  {
+    "text": "And one in four organizations were",
+    "startMs": 9440,
+    "endMs": 11080,
+    "confidence": 1,
+    "timestampMs": 10260
+  },
+  {
+    "text": "building or fine tuning their own custom GenAI models.",
+    "startMs": 11080,
+    "endMs": 14440,
+    "confidence": 1,
+    "timestampMs": 12760
+  },
+  {
+    "text": "And a small portion of organizations",
+    "startMs": 14440,
+    "endMs": 16959,
+    "confidence": 1,
+    "timestampMs": 15699.5
+  },
+  {
+    "text": "were keeping the infrastructure as is",
+    "startMs": 16959,
+    "endMs": 19160,
+    "confidence": 1,
+    "timestampMs": 18059.5
+  },
+  {
+    "text": "and simply just calling an API within their cloud data",
+    "startMs": 19160,
+    "endMs": 22559,
+    "confidence": 1,
+    "timestampMs": 20859.5
+  },
+  {
+    "text": "boundary.",
+    "startMs": 22559,
+    "endMs": 23440,
+    "confidence": 1,
+    "timestampMs": 22999.5
+  },
+  {
+    "text": "And these organizations were doing the best",
+    "startMs": 23440,
+    "endMs": 26400,
+    "confidence": 1,
+    "timestampMs": 24920
+  },
+  {
+    "text": "by shipping the fastest and thus iterating the fastest",
+    "startMs": 26400,
+    "endMs": 30200,
+    "confidence": 1,
+    "timestampMs": 28299.999999999996
+  },
+  {
+    "text": "and then getting the most user engagement for their products.",
+    "startMs": 30200,
+    "endMs": 34520,
+    "confidence": 1,
+    "timestampMs": 32360
+  },
+  {
+    "text": "Stop listening to all these influencers",
+    "startMs": 34520,
+    "endMs": 37080,
+    "confidence": 1,
+    "timestampMs": 35800
+  },
+  {
+    "text": "about all these tools and fine tuning infrastructure",
+    "startMs": 37080,
+    "endMs": 40080,
+    "confidence": 1,
+    "timestampMs": 38580
+  },
+  {
+    "text": "that you supposedly need.",
+    "startMs": 40080,
+    "endMs": 41720,
+    "confidence": 1,
+    "timestampMs": 40900
+  },
+  {
+    "text": "You don't need any of that.",
+    "startMs": 41720,
+    "endMs": 43959,
+    "confidence": 1,
+    "timestampMs": 42839.5
+  },
+  {
+    "text": "Just keep your infrastructure super simple and call an API.",
+    "startMs": 43959,
+    "endMs": 47200,
+    "confidence": 1,
+    "timestampMs": 45579.5
+  },
+  {
+    "text": "That's all you need.",
+    "startMs": 47200,
+    "endMs": 49320,
+    "confidence": 1,
+    "timestampMs": 48260.00000000001
+  }
+]
