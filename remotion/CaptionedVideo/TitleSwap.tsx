@@ -2,6 +2,7 @@ import { AbsoluteFill, OffthreadVideo, useCurrentFrame } from 'remotion';
 import { TitleAnimation, BoxReveal, TypewriterText } from './index';
 import { OverlayConfig } from '@/types/constants';
 import { overlayStyles } from './styles';
+import { BaseVideoOverlay } from './BaseVideoOverlay';
 
 export const TitleSwap: React.FC<OverlayConfig> = ({
   title,
@@ -16,25 +17,18 @@ export const TitleSwap: React.FC<OverlayConfig> = ({
   });
   
   return (
-    <AbsoluteFill>
-      {videoSrc && (
-        <OffthreadVideo src={videoSrc} style={overlayStyles.video} />
-      )}
-      <AbsoluteFill style={overlayStyles.darkOverlay} />
-      <AbsoluteFill style={overlayStyles.scanlines} />
-      <AbsoluteFill style={overlayStyles.content}>
-        <BoxReveal>
-          <TitleAnimation title={title} />
-          <div style={{ ...overlayStyles.text, minHeight: '100px' }}>
-            {currentItemIndex >= 0 && (
-              <TypewriterText 
-                text={items[currentItemIndex].text} 
-                delay={items[currentItemIndex].delay}
-              />
-            )}
-          </div>
-        </BoxReveal>
-      </AbsoluteFill>
-    </AbsoluteFill>
+    <BaseVideoOverlay videoSrc={videoSrc}>
+      <BoxReveal>
+        <TitleAnimation title={title} />
+        <div style={{ ...overlayStyles.text, minHeight: '100px' }}>
+          {currentItemIndex >= 0 && (
+            <TypewriterText 
+              text={items[currentItemIndex].text} 
+              delay={items[currentItemIndex].delay}
+            />
+          )}
+        </div>
+      </BoxReveal>
+    </BaseVideoOverlay>
   );
 }; 

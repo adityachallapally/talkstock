@@ -60,11 +60,16 @@ export const overlayStyles = {
   },
 
   title: {
-    fontSize: '48px',
+    fontSize: '64px',
     fontWeight: 'bold',
-    marginBottom: '24px',
-    textAlign: 'center' as const,
-  },
+    marginBottom: '48px',
+    padding: '20px 40px',
+    backgroundColor: '#00A67E',
+    display: 'inline-block',
+    maxWidth: '80%',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+    marginTop: '40px',
+  } as CSSProperties,
 
   text: {
     color: 'white',

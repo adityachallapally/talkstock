@@ -25,7 +25,7 @@ import { NumberHighlight } from './NumberHighlight';
 import { StockVideo } from './StockVideo';
 import { Lottie } from "@remotion/lottie";
 import animationData from "./animation.json";
-
+import { overlayStyles } from './styles';
 
 export type SubtitleProp = {
 	startInSeconds: number;
@@ -96,25 +96,18 @@ export const TypewriterText: React.FC<{
 		</>
 	);
 };
-
 export const BoxReveal: React.FC<{children: React.ReactNode}> = ({children}) => {
     const frame = useCurrentFrame();
     const {fps} = useVideoConfig();
     
-    // Animation takes 1 second (30 frames at 30fps)
     const progress = Math.min(frame / fps, 1);
-    
-    // Use easeOut for smoother animation
     const easeOutProgress = 1 - Math.pow(1 - progress, 2);
     
     return (
         <div style={{
-            border: '2px solid rgba(255, 255, 255, 0.6)',
+            ...overlayStyles.container,
             padding: `40px ${50 * easeOutProgress}px`,
             width: `${80 * easeOutProgress}%`,
-            backgroundColor: 'rgba(0, 0, 0, 0.2)',
-            backdropFilter: 'blur(8px)',
-            boxShadow: '0 0 20px rgba(0,0,0,0.3)',
             position: 'absolute',
             left: '50%',
             top: '50%',
@@ -157,34 +150,25 @@ export const TitleAnimation: React.FC<{title: string}> = ({title}) => {
     const frame = useCurrentFrame();
     const {fps} = useVideoConfig();
     
-    // Animation duration: 0.2 seconds (6 frames at 30fps)
     const duration = 2 * fps;
     const progress = Math.min(frame / duration, 1);
-    
-    // Easing function for smoother animation
     const easeOutQuint = 1 - Math.pow(1 - progress, 5);
-    
-    // Start from -100px above and animate to 0
     const translateY = -100 + (100 * easeOutQuint);
     
     return (
         <div style={{
-            backgroundColor: '#00A67E',
-            padding: '16px 40px',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-            position: 'absolute',
-            top: '-120px',
-            left: '50%',
-            transform: `translate(-50%, ${translateY}px)`,
-            zIndex: 2,
+            ...overlayStyles.title,
+            transform: `translateY(${translateY}px)`,
             opacity: easeOutQuint,
+            position: 'relative',
+            zIndex: 2,
         }}>
             <h1 style={{
-                color: 'white',
-                fontSize: '77px',
-                fontFamily: 'Montserrat',
-                fontWeight: 600,
                 margin: 0,
+                color: 'white',
+                fontFamily: 'Montserrat',
+                fontSize: overlayStyles.title.fontSize,
+                fontWeight: 600,
                 letterSpacing: '2px',
                 textShadow: '3px 3px 6px rgba(0,0,0,0.4), 0px 0px 10px rgba(0,0,0,0.2)'
             }}>
