@@ -23,6 +23,7 @@ import { TemplateType } from '@/types/constants';
 import { OverlayConfig } from '@/types/constants';
 import { TitleSwap } from './TitleSwap';
 import { NumberHighlight } from './NumberHighlight';
+import { StockVideo } from './StockVideo';
 
 
 export type SubtitleProp = {
@@ -138,19 +139,20 @@ type OverlaySection = {
   videoSrc: string;
 };
 
-// New reusable component for overlay sections
 const OverlaySection: React.FC<OverlayConfig> = (props) => {
-  switch (props.type) {
-    case TemplateType.TITLE_BULLETS:
-      return <TitleBullets {...props} />;
-    case TemplateType.TITLE_SWAP:
-      return <TitleSwap {...props} />;
-    case TemplateType.NUMBER_HIGHLIGHT:
-      return <NumberHighlight {...props} />;
-    default:
-      return <TitleBullets {...props} />;
-  }
-};
+	switch (props.type) {
+	  case TemplateType.TITLE_BULLETS:
+		return <TitleBullets {...props} />;
+	  case TemplateType.TITLE_SWAP:
+		return <TitleSwap {...props} />;
+	  case TemplateType.NUMBER_HIGHLIGHT:
+		return <NumberHighlight {...props} />;
+	  case TemplateType.STOCK_VIDEO:
+		return <StockVideo {...props} />;
+	  default:
+		return <TitleBullets {...props} />;
+	}
+  };
 
 // Update TitleAnimation to accept title prop
 export const TitleAnimation: React.FC<{title: string}> = ({title}) => {

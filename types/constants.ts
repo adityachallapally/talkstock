@@ -16,7 +16,8 @@ export const VIDEO_FPS = 30;
 export enum TemplateType {
   TITLE_BULLETS = 'titleBullets',
   TITLE_SWAP = 'titleSwap',
-  NUMBER_HIGHLIGHT = 'numberHighlight'
+  NUMBER_HIGHLIGHT = 'numberHighlight',
+  STOCK_VIDEO = 'stockVideo'
 }
 
 export interface OverlayConfig {
