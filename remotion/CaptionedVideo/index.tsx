@@ -24,6 +24,8 @@ import { OverlayConfig } from '@/types/constants';
 import { TitleSwap } from './TitleSwap';
 import { NumberHighlight } from './NumberHighlight';
 import { StockVideo } from './StockVideo';
+import { Lottie } from "@remotion/lottie";
+import animationData from "./animation.json";
 
 
 export type SubtitleProp = {
@@ -78,7 +80,7 @@ export const TypewriterText: React.FC<{
 	return (
 		<>
 			{displayText}
-			{showCursor && <span style={{ opacity: 0.8 }}>|</span>}
+			{showCursor && <span style={{ opacity: 0.1 }}>|</span>}
 			{shouldPlaySound && (
 				<audio 
 					src={staticFile('long-keyboard-typing.mp3')} 
@@ -140,19 +142,29 @@ type OverlaySection = {
 };
 
 const OverlaySection: React.FC<OverlayConfig> = (props) => {
-	switch (props.type) {
-	  case TemplateType.TITLE_BULLETS:
-		return <TitleBullets {...props} />;
-	  case TemplateType.TITLE_SWAP:
-		return <TitleSwap {...props} />;
-	  case TemplateType.NUMBER_HIGHLIGHT:
-		return <NumberHighlight {...props} />;
-	  case TemplateType.STOCK_VIDEO:
-		return <StockVideo {...props} />;
-	  default:
-		return <TitleBullets {...props} />;
-	}
-  };
+  console.log('OverlaySection props:', {
+    type: props.type,
+    title: props.title,
+  });
+
+  switch (props.type) {
+    case TemplateType.STOCK_VIDEO:
+      console.log('Stock Video template triggered');
+      return <StockVideo {...props} />;
+    case TemplateType.TITLE_BULLETS:
+      console.log('Title Bullets template triggered');
+      return <TitleBullets {...props} />;
+    case TemplateType.TITLE_SWAP:
+      console.log('Title Swap template triggered');
+      return <TitleSwap {...props} />;
+    case TemplateType.NUMBER_HIGHLIGHT:
+      console.log('Number Highlight template triggered');
+      return <NumberHighlight {...props} />;
+    default:
+      console.log('Default template (Title Bullets) triggered');
+      return <TitleBullets {...props} />;
+  }
+};
 
 // Update TitleAnimation to accept title prop
 export const TitleAnimation: React.FC<{title: string}> = ({title}) => {
@@ -196,6 +208,21 @@ export const TitleAnimation: React.FC<{title: string}> = ({title}) => {
     );
 };
 
+const LottieOverlay: React.FC = () => {
+  return (
+    <div style={{
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      width: '100%',
+      height: '100%',
+      opacity: 0.2, // 80% transparent
+      zIndex: 1,
+    }}>
+      <Lottie animationData={animationData} />
+    </div>
+  );
+};
 
 export const CaptionedVideo: React.FC<{
 	src: string;
@@ -241,6 +268,8 @@ export const CaptionedVideo: React.FC<{
 					src={src}
 				/>
 			</AbsoluteFill>
+
+			<LottieOverlay />
 
 			{overlays.map((overlay, index) => (
 				<Sequence

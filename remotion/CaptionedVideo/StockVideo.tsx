@@ -1,6 +1,5 @@
 import { AbsoluteFill, OffthreadVideo } from 'remotion';
 import { OverlayConfig } from '@/types/constants';
-import { overlayStyles } from './styles';
 
 export const StockVideo: React.FC<OverlayConfig> = ({
   videoSrc,

@@ -12,7 +12,8 @@ export type Point = {
   export enum TemplateType {
     TITLE_BULLETS = 'titleBullets',
     TITLE_SWAP = 'titleSwap',
-    NUMBER_HIGHLIGHT = 'numberHighlight'
+    NUMBER_HIGHLIGHT = 'numberHighlight',
+    STOCK_VIDEO = "STOCK_VIDEO"
   }
   
   export type VideoSegment = {
