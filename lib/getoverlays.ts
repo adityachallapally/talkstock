@@ -1,7 +1,7 @@
-import { OverlayConfig, Caption, OverlaySection } from '@/types/constants';
+import { OverlayConfig, Caption, PromptResponse } from '@/types/constants';
 import { createClient } from 'pexels';
 import Anthropic from '@anthropic-ai/sdk';
-import { TemplateType } from '@/types/types';
+import { TemplateType } from '@/types/constants';
 
 // Initialize Anthropic client
 const anthropic = new Anthropic({ apiKey: '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', dangerouslyAllowBrowser: true });
@@ -9,7 +9,7 @@ const anthropic = new Anthropic({ apiKey: 'sk-ant-api03-gehyRuIuXTW0h9MOtX1Ajz2s
 // Pexels client
 const pexelsClient = createClient('V4GUX2DiZafEDUKHToyAhpJM2LD18BpU3WdkCvsi4TMX8BTSOH35wQJX');
 
-const getOverlayStructure = async (captions: Caption[]): Promise<OverlaySection[]> => {
+const getOverlayStructure = async (captions: Caption[]): Promise<PromptResponse[]> => {
   const response = await fetch('/captions_wrapper_myth.json');
   const replaced_captions = await response.json();
 
@@ -90,8 +90,8 @@ const generateOverlays = async (transcriptUrl: string): Promise<OverlayConfig[]>
         title: section.title,
         videoSrc: await getFirstMp4VideoUrl(section.videoKeyword),
         type: {
-          'BULLET_LIST': TemplateType.TITLE_BULLETS,
-          'WORD_SWAP': TemplateType.TITLE_SWAP,
+          'BULLET_LIST': TemplateType.BULLET_LIST,
+          'WORD_SWAP': TemplateType.WORD_SWAP,
           'NUMBER_HIGHLIGHT': TemplateType.NUMBER_HIGHLIGHT,
           'STOCK_VIDEO': TemplateType.STOCK_VIDEO
         }[section.type],

@@ -19,8 +19,7 @@ import {getVideoMetadata} from '@remotion/media-utils';
 import {loadFont, loadMontserrat} from '../load-font';
 import {NoCaptionFile} from './NoCaptionFile';
 import { TitleBullets } from './TitleBullets';
-import { TemplateType } from '@/types/constants';
-import { OverlayConfig } from '@/types/constants';
+import { TemplateType, OverlayItem, OverlayConfig } from '@/types/constants';
 import { TitleSwap } from './TitleSwap';
 import { NumberHighlight } from './NumberHighlight';
 import { StockVideo } from './StockVideo';
@@ -127,22 +126,9 @@ export const BoxReveal: React.FC<{children: React.ReactNode}> = ({children}) => 
     );
 };
 
-// New type definitions for overlay content
-type OverlayItem = {
-  text: string;
-  delay: number;
-};
 
-type OverlaySection = {
-  startFrame: number;
-  duration: number;
-  title: string;
-  items: OverlayItem[];
-  videoSrc: string;
-};
-
-const OverlaySection: React.FC<OverlayConfig> = (props) => {
-  console.log('OverlaySection props:', {
+const OverlayRouter: React.FC<OverlayConfig> = (props) => {
+  console.log('OverlayConfig props:', {
     type: props.type,
     title: props.title,
   });
@@ -151,10 +137,10 @@ const OverlaySection: React.FC<OverlayConfig> = (props) => {
     case TemplateType.STOCK_VIDEO:
       console.log('Stock Video template triggered');
       return <StockVideo {...props} />;
-    case TemplateType.TITLE_BULLETS:
+    case TemplateType.BULLET_LIST:
       console.log('Title Bullets template triggered');
       return <TitleBullets {...props} />;
-    case TemplateType.TITLE_SWAP:
+    case TemplateType.WORD_SWAP:
       console.log('Title Swap template triggered');
       return <TitleSwap {...props} />;
     case TemplateType.NUMBER_HIGHLIGHT:
@@ -277,7 +263,7 @@ export const CaptionedVideo: React.FC<{
 					from={overlay.startFrame}
 					durationInFrames={overlay.duration}
 				>
-					<OverlaySection {...overlay} />
+					<OverlayRouter {...overlay} />
 				</Sequence>
 			))}
 

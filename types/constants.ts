@@ -29,7 +29,7 @@ export interface OverlayConfig {
   type: TemplateType;
 }
 
-interface OverlayItem {
+export interface OverlayItem {
   text: string;
   delay: number;
 }
@@ -42,7 +42,7 @@ export interface Caption {
   timestampMs: number;
 }
 
-export interface OverlaySection {
+export interface PromptResponse {
   startMs: number;
   endMs: number;
   title: string;
