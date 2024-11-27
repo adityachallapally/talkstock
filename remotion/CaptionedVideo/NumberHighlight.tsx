@@ -12,18 +12,34 @@ export const NumberHighlight: React.FC<OverlayConfig> = ({
   return (
     <BaseVideoOverlay videoSrc={videoSrc}>
       <div style={overlayStyles.container}>
-        <div style={{ ...overlayStyles.title, color: '#ff4444' }}>
+
+
+        <span style={{
+          color: '#00875A',
+          fontWeight: 'bold',
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+          fontSize: '288px',
+          lineHeight: '1',
+          textAlign: 'center',
+          width: '100%',
+          display: 'block',
+        }}>
           {title}
-        </div>
-        <div style={overlayStyles.text}>
-          {items.map((item, index) => (
-            <div key={index} style={{ marginBottom: '24px' }}>
-              <TypewriterText 
-                text={`${index + 1}. ${item.text}`} 
-                delay={item.delay} 
-              />
-            </div>
-          ))}
+        </span>
+
+        <div style={{
+          fontSize: '72px',
+          color: 'white',
+          fontWeight: 'bold',
+          lineHeight: '1.2',
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+          textAlign: 'center',
+          maxWidth: '900px',
+        }}>
+          <TypewriterText
+            text={items[0].text}
+            delay={items[0].delay}
+          />
         </div>
       </div>
     </BaseVideoOverlay>

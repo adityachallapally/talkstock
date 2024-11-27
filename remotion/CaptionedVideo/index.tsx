@@ -23,8 +23,7 @@ import { TemplateType, OverlayItem, OverlayConfig } from '@/types/constants';
 import { TitleSwap } from './TitleSwap';
 import { NumberHighlight } from './NumberHighlight';
 import { StockVideo } from './StockVideo';
-import { Lottie } from "@remotion/lottie";
-import animationData from "./animation.json";
+import LottieOverlay from './LottieOverlay';
 import { overlayStyles } from './styles';
 
 export type SubtitleProp = {
@@ -178,22 +177,6 @@ export const TitleAnimation: React.FC<{title: string}> = ({title}) => {
     );
 };
 
-const LottieOverlay: React.FC = () => {
-  return (
-    <div style={{
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      width: '100%',
-      height: '100%',
-      opacity: 0.2, // 80% transparent
-      zIndex: 1,
-    }}>
-      <Lottie animationData={animationData} />
-    </div>
-  );
-};
-
 export const CaptionedVideo: React.FC<{
 	src: string;
 	overlays?: OverlayConfig[];
@@ -239,7 +222,12 @@ export const CaptionedVideo: React.FC<{
 				/>
 			</AbsoluteFill>
 
-			<LottieOverlay />
+			{/* <Sequence
+				from={0} // Specify when you want the animation to start
+				durationInFrames={180} // Match this with your Lottie animation duration
+			>
+				<LottieOverlay text="Your Dynamic Text" />
+			</Sequence> */}
 
 			{overlays.map((overlay, index) => (
 				<Sequence
