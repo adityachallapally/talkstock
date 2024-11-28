@@ -1,27 +1,7 @@
 import { AbsoluteFill, OffthreadVideo, useCurrentFrame, interpolate } from 'remotion';
-import { TitleAnimation, BoxReveal } from './index';
 import { OverlayConfig } from '@/types/constants';
 import { overlayStyles } from './styles';
 import { BaseVideoOverlay } from './BaseVideoOverlay';
-
-const FadeText: React.FC<{ text: string; delay: number }> = ({ text, delay }) => {
-  const frame = useCurrentFrame();
-  const FADE_DURATION = 15; // Adjust these values to control fade speed
-  const HOLD_DURATION = 45; // How long the text stays fully visible
-  
-  const relativeFrame = frame - delay;
-  const opacity = interpolate(
-    relativeFrame,
-    [0, FADE_DURATION, HOLD_DURATION, HOLD_DURATION + FADE_DURATION], // keyframes
-    [0, 1, 1, 0], // opacity values
-    {
-      extrapolateLeft: 'clamp',
-      extrapolateRight: 'clamp',
-    }
-  );
-
-  return <div style={{ opacity }}>{text}</div>;
-};
 
 export const TitleSwap: React.FC<OverlayConfig> = ({
   title,
@@ -34,20 +14,60 @@ export const TitleSwap: React.FC<OverlayConfig> = ({
     const nextDelay = items[index + 1]?.delay ?? Infinity;
     return frame >= item.delay && frame < nextDelay;
   });
+
+  const currentItem = items[currentItemIndex];
+  const nextDelay = items[currentItemIndex + 1]?.delay ?? Infinity;
+  const finalFrame = nextDelay === Infinity ? 999999 : nextDelay;
+
+  const translateX = currentItem ? interpolate(
+    frame,
+    [currentItem.delay, currentItem.delay + 15, finalFrame - 15, finalFrame],
+    [-100, 0, 0, 100],
+    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+  ) : 0;
   
   return (
     <BaseVideoOverlay videoSrc={videoSrc}>
-      <BoxReveal>
-        <TitleAnimation title={title} />
-        <div style={{ ...overlayStyles.text, minHeight: '100px' }}>
-          {currentItemIndex >= 0 && (
-            <FadeText 
-              text={items[currentItemIndex].text} 
-              delay={items[currentItemIndex].delay}
-            />
-          )}
+      <div style={{
+        fontSize: '144px',
+        fontWeight: 'bold',
+        color: 'white',
+        textShadow: '2px 2px 4px rgba(0,0,0,0.5)',
+        marginBottom: '40px',
+        fontStyle: 'italic',
+        textAlign: 'center',
+        width: '100%'
+      }}>
+        {title}
+      </div>
+
+      {currentItemIndex >= 0 && (
+        <div style={{
+          background: 'rgba(0, 0, 0, 0.25)',
+          backgroundClip: 'padding-box',
+          padding: '20px 40px',
+          borderRadius: '8px',
+          width: 'auto',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '160px',
+          border: '10px solid rgba(0,0,0, 0.3)',
+          maxWidth: '80%',
+          margin: '0 auto',
+          transform: `translateX(${translateX}%)`,
+        }}>
+          <div style={{ 
+            fontSize: '120px',
+            fontWeight: 'bold',
+            textAlign: 'center',
+            marginTop: '20px',
+            color: 'white',
+          }}>
+            {currentItem.text}
+          </div>
         </div>
-      </BoxReveal>
+      )}
     </BaseVideoOverlay>
   );
 }; 

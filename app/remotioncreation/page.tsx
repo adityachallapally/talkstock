@@ -9,7 +9,7 @@ import {
 	calculateCaptionedVideoMetadata,
 	captionedVideoSchema,
 } from '@/remotion/CaptionedVideo';
-
+import { mockOverlays } from '@/lib/getoverlays';
 import { OverlayConfig } from '@/types/constants';
 
 interface VideoCreatorPageProps {
@@ -25,7 +25,7 @@ const VideoCreatorPage: React.FC<VideoCreatorPageProps> = () => {
   useEffect(() => {
     const fetchOverlays = async () => {
       setIsLoading(true);
-      const overlayer = await generateOverlays('https://hx7mp5wayo6ybdwl.public.blob.vercel-storage.com/stanford_video-lGCdCm0OcnuLhBPHM9f50eS4zyqiV0.json');
+      const overlayer = await mockOverlays(); //generateOverlays('https://hx7mp5wayo6ybdwl.public.blob.vercel-storage.com/stanford_video-lGCdCm0OcnuLhBPHM9f50eS4zyqiV0.json');
       setOverlays(overlayer);
       setIsLoading(false);
     };

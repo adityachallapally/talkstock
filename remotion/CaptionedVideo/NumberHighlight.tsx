@@ -1,4 +1,4 @@
-import { AbsoluteFill, OffthreadVideo } from 'remotion';
+import { AbsoluteFill, OffthreadVideo, useCurrentFrame, interpolate } from 'remotion';
 import { TypewriterText } from './index';
 import { OverlayConfig } from '@/types/constants';
 import { overlayStyles } from './styles';
@@ -9,11 +9,25 @@ export const NumberHighlight: React.FC<OverlayConfig> = ({
   items,
   videoSrc,
 }) => {
+  const frame = useCurrentFrame();
+  const animationDuration = 30; // Duration in frames (adjust as needed)
+  
+  const hasPercentage = title.toString().includes('%');
+  const targetNumber = parseInt(title.toString().replace('%', '')) || 0;
+  
+  const currentNumber = interpolate(
+    frame,
+    [0, animationDuration],
+    [0, targetNumber],
+    {
+      extrapolateRight: 'clamp',
+      extrapolateLeft: 'clamp'
+    }
+  );
+
   return (
     <BaseVideoOverlay videoSrc={videoSrc}>
       <div style={overlayStyles.container}>
-
-
         <span style={{
           color: '#00875A',
           fontWeight: 'bold',
@@ -24,9 +38,8 @@ export const NumberHighlight: React.FC<OverlayConfig> = ({
           width: '100%',
           display: 'block',
         }}>
-          {title}
+          {Math.round(currentNumber)}{hasPercentage ? '%' : ''}
         </span>
-
         <div style={{
           fontSize: '72px',
           color: 'white',

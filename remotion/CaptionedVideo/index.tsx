@@ -25,6 +25,7 @@ import { NumberHighlight } from './NumberHighlight';
 import { StockVideo } from './StockVideo';
 import LottieOverlay from './LottieOverlay';
 import { overlayStyles } from './styles';
+import { TitleFrame } from './TitleFrame';
 
 export type SubtitleProp = {
 	startInSeconds: number;
@@ -120,26 +121,17 @@ export const BoxReveal: React.FC<{children: React.ReactNode}> = ({children}) => 
 
 
 const OverlayRouter: React.FC<OverlayConfig> = (props) => {
-  console.log('OverlayConfig props:', {
-    type: props.type,
-    title: props.title,
-  });
 
   switch (props.type) {
     case TemplateType.STOCK_VIDEO:
-      console.log('Stock Video template triggered');
       return <StockVideo {...props} />;
     case TemplateType.BULLET_LIST:
-      console.log('Title Bullets template triggered');
       return <TitleBullets {...props} />;
     case TemplateType.WORD_SWAP:
-      console.log('Title Swap template triggered');
       return <TitleSwap {...props} />;
     case TemplateType.NUMBER_HIGHLIGHT:
-      console.log('Number Highlight template triggered');
       return <NumberHighlight {...props} />;
     default:
-      console.log('Default template (Title Bullets) triggered');
       return <TitleBullets {...props} />;
   }
 };
@@ -169,7 +161,8 @@ export const TitleAnimation: React.FC<{title: string}> = ({title}) => {
                 fontSize: overlayStyles.title.fontSize,
                 fontWeight: 600,
                 letterSpacing: '2px',
-                textShadow: '3px 3px 6px rgba(0,0,0,0.4), 0px 0px 10px rgba(0,0,0,0.2)'
+                textShadow: '3px 3px 6px rgba(0,0,0,0.4), 0px 0px 10px rgba(0,0,0,0.2)',
+                whiteSpace: 'nowrap'
             }}>
                 {title}
             </h1>
@@ -222,12 +215,9 @@ export const CaptionedVideo: React.FC<{
 				/>
 			</AbsoluteFill>
 
-			{/* <Sequence
-				from={0} // Specify when you want the animation to start
-				durationInFrames={180} // Match this with your Lottie animation duration
-			>
-				<LottieOverlay text="Your Dynamic Text" />
-			</Sequence> */}
+			<Sequence from={0} durationInFrames={150}>
+				<TitleFrame />
+			</Sequence>
 
 			{overlays.map((overlay, index) => (
 				<Sequence

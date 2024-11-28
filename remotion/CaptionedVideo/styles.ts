@@ -28,16 +28,13 @@ export const overlayStyles = {
 
   scanlines: {
     background: `repeating-linear-gradient(
-      180deg,
-      transparent,
-      transparent 3px,
-      rgba(255, 255, 255, 0.01) 4px,
-      rgba(255, 255, 255, 0.03) 4.5px,
-      rgba(255, 255, 255, 0.1) 5px,
-      rgba(255, 255, 255, 0.1) 29px,
-      rgba(255, 255, 255, 0.03) 29.5px,
-      rgba(255, 255, 255, 0.01) 30px,
-      transparent 30px
+            180deg,
+            rgba(0, 0, 0, 0.1),
+            rgba(0, 0, 0, 0.1) 5px,
+            rgba(0, 0, 0, 0.05) 5.5px,
+            rgba(0, 0, 0, 0.03) 6px,
+            transparent 6px,
+            transparent 30px
     )`,
     position: 'absolute',
   } as CSSProperties,
@@ -60,7 +57,7 @@ export const overlayStyles = {
   },
 
   title: {
-    fontSize: '64px',
+    fontSize: '100px',
     fontWeight: 'bold',
     marginBottom: '48px',
     padding: '20px 40px',

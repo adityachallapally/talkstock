@@ -32,14 +32,11 @@ export const BaseTemplate: React.FC<OverlayConfig> = ({
         style={{
           background: `repeating-linear-gradient(
             180deg,
-            transparent,
-            transparent 3px,
-            rgba(255, 255, 255, 0.01) 4px,
-            rgba(255, 255, 255, 0.03) 4.5px,
+            rgba(255, 255, 255, 0.1),
             rgba(255, 255, 255, 0.1) 5px,
-            rgba(255, 255, 255, 0.1) 29px,
-            rgba(255, 255, 255, 0.03) 29.5px,
-            rgba(255, 255, 255, 0.01) 30px,
+            rgba(255, 255, 255, 0.03) 5.5px,
+            rgba(255, 255, 255, 0.01) 6px,
+            transparent 6px,
             transparent 30px
           )`,
           position: 'absolute',
