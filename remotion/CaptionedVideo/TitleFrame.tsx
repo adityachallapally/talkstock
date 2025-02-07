@@ -3,8 +3,8 @@ import { AbsoluteFill, Sequence, interpolate, useCurrentFrame } from "remotion";
 export const TitleFrame: React.FC = () => {
   const frame = useCurrentFrame();
   
-  // Combine the animations to happen together
-  const contentOpacity = interpolate(frame, [0, 20], [0, 1], {
+  // Single animation for both title and subtitle
+  const titleOpacity = interpolate(frame, [0, 20], [0, 1], {
     extrapolateRight: "clamp",
   });
 
@@ -32,13 +32,12 @@ export const TitleFrame: React.FC = () => {
         justifyContent: "center",
         width: "100%",
         position: "absolute",
-        top: "35%",
-        transform: "translateY(-50%)",
+        top: "10%",
+        transform: "translateY(0)",
         gap: "20px",
       }}>
-        {/* Title and Subtitle now in same Sequence */}
         <Sequence from={0}>
-          <div style={{ opacity: contentOpacity, width: "100%", textAlign: "center" }}>
+          <div style={{ opacity: titleOpacity, width: "100%", textAlign: "center" }}>
             <div style={{
               backgroundColor: "#ff0000",
               color: "white",
