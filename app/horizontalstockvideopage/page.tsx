@@ -12,7 +12,7 @@ const HorizontalStockVideoPage: React.FC = () => {
   const [duration, setDuration] = useState<number>(0);
   const videoUrls = [
     'https://static.videezy.com/system/resources/previews/000/000/168/original/Record.mp4',
-    'https://static.videezy.com/system/resources/previews/000/044/903/original/telepoorte_fnl.mp4',
+    'https://static.videezy.com/system/resources/previews/000/000/168/original/Record.mp4',
     'https://static.videezy.com/system/resources/previews/000/000/168/original/Record.mp4',
   ];
 

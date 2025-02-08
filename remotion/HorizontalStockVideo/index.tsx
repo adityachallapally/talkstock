@@ -13,7 +13,8 @@ import {
 import {z} from 'zod';
 import {getVideoMetadata} from '@remotion/media-utils';
 import {useEffect, useState} from 'react';
-import {textAnimations} from './TextAnimations';
+import { RemotionTextAnimate } from './Tryingtomatchframeranimations';
+import {ScaleLetterText, StaggeredText} from './MyTextAnimations';
 
 // Schema for the video props
 export const stockVideoSchema = z.object({
@@ -42,6 +43,7 @@ export const HorizontalStockVideo: React.FC<{
   videos: string[];
 }> = ({videos}) => {
   const {fps} = useVideoConfig();
+  const frame = useCurrentFrame();
   const [videoDurations, setVideoDurations] = useState<number[]>([]);
 
   useEffect(() => {
@@ -61,6 +63,8 @@ export const HorizontalStockVideo: React.FC<{
   if (videoDurations.length === 0) {
     return null;
   }
+
+  const testText = "Testing This Animation";
 
   return (
     <AbsoluteFill style={{backgroundColor: 'black'}}>
@@ -89,15 +93,38 @@ export const HorizontalStockVideo: React.FC<{
         );
       })}
       
-      {textAnimations.map((animation, index) => (
-        <Sequence
-          key={`text-animation-${index}`}
-          from={animation.startFrame}
-          durationInFrames={animation.duration}
+      {/* <Sequence from={0} durationInFrames={120}>
+        <StaggeredText
+          text={testText}
+          frame={0}
+          duration={120}
+          isLarge={true}
+        />
+      </Sequence> */}
+
+      <Sequence from={60} durationInFrames={58}>
+        <AbsoluteFill
+          style={{
+            justifyContent: 'center',
+            alignItems: 'center',
+            textAlign: 'center',
+          }}
         >
-          {animation.component}
-        </Sequence>
-      ))}
+          <RemotionTextAnimate
+            animation="blurInUp"
+            by="word"
+            entranceStartFrame={60}
+            entranceDurationInFrames={9}
+            showDurationInFrames={40}
+            exitDurationInFrames={9}
+            className="text-4xl font-bold"
+            segmentClassName="mx-1"
+          >
+            This text will animate exactly like Framer Motion!
+          </RemotionTextAnimate>
+        </AbsoluteFill>
+      </Sequence>
+      
     </AbsoluteFill>
   );
 };
