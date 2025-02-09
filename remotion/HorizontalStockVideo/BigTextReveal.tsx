@@ -62,13 +62,11 @@ export const BigTextReveal: React.FC<BigTextRevealProps> = ({
     <div
       style={{
         width: '100%',
-        height: '100%',
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
         perspective: '1000px',
         overflow: 'visible',
-        position: 'relative',
       }}
     >
       <div
@@ -79,7 +77,6 @@ export const BigTextReveal: React.FC<BigTextRevealProps> = ({
           gap: `${letterSpacing}em`,
           transform: `scale(${currentScale})`,
           transformOrigin: 'center center',
-          position: 'absolute',
         }}
       >
         {text.split('').map((char, index) => {

@@ -30,7 +30,7 @@ export const TestAnimationComposition: React.FC = () => {
 
         <RemotionTextAnimate
           animation="clipDropIn"
-          entranceStartFrame={15}
+          entranceStartFrame={45}
           entranceDurationInFrames={30}
           showDurationInFrames={60}
           exitDurationInFrames={15}
@@ -43,6 +43,23 @@ export const TestAnimationComposition: React.FC = () => {
           }}
         >
           GRADUATE
+        </RemotionTextAnimate>
+
+        <RemotionTextAnimate
+          animation="clipDropIn"
+          entranceStartFrame={75}
+          entranceDurationInFrames={30}
+          showDurationInFrames={60}
+          exitDurationInFrames={15}
+          by="character"
+          className="text-6xl font-bold"
+          style={{
+            position: 'relative',
+            zIndex: 1,
+            marginTop: '-0.5rem',
+          }}
+        >
+          CERTIFICATE
         </RemotionTextAnimate>
       </div>
     </div>
