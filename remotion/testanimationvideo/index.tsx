@@ -1,6 +1,5 @@
-import { Composition } from 'remotion';
+
 import { RemotionTextAnimate } from '../HorizontalStockVideo/Tryingtomatchframeranimations';
-import { DropInText } from '../HorizontalStockVideo/Dropin';
 
 export const TestAnimationComposition: React.FC = () => {
   const animations = [
@@ -22,27 +21,6 @@ export const TestAnimationComposition: React.FC = () => {
   const lastAnimationEndFrame = 30 + (animations.length - 1) * 120 + 90; // Start + (animations * spacing) + duration
 
   return (
-    // <div style={{ flex: 1, backgroundColor: 'white', padding: 80 }}>
-    //   {animations.map((animation, index) => {
-    //     const startFrame = 30 + index * 120; // Space them out by 120 frames
-    //     return (
-    //       <div key={animation} style={{ marginBottom: 40 }}>
-    //         <RemotionTextAnimate
-    //           animation={animation}
-    //           by="character"
-    //           entranceStartFrame={startFrame}
-    //           entranceDurationInFrames={8}
-    //           showDurationInFrames={60}
-    //           exitDurationInFrames={15}
-    //           className="text-6xl font-bold tracking-wide uppercase"
-    //           segmentClassName="mx-1"
-    //         >
-    //           {`This is the ${animation} animation`}
-    //         </RemotionTextAnimate>
-    //       </div>
-    //     );
-    //   })}
-    // </div>
 
     <div
       style={{
@@ -82,3 +60,25 @@ export const TestAnimationComposition: React.FC = () => {
     </div>
   );
 };
+
+    // <div style={{ flex: 1, backgroundColor: 'white', padding: 80 }}>
+    //   {animations.map((animation, index) => {
+    //     const startFrame = 30 + index * 120; // Space them out by 120 frames
+    //     return (
+    //       <div key={animation} style={{ marginBottom: 40 }}>
+    //         <RemotionTextAnimate
+    //           animation={animation}
+    //           by="character"
+    //           entranceStartFrame={startFrame}
+    //           entranceDurationInFrames={8}
+    //           showDurationInFrames={60}
+    //           exitDurationInFrames={15}
+    //           className="text-6xl font-bold tracking-wide uppercase"
+    //           segmentClassName="mx-1"
+    //         >
+    //           {`This is the ${animation} animation`}
+    //         </RemotionTextAnimate>
+    //       </div>
+    //     );
+    //   })}
+    // </div>

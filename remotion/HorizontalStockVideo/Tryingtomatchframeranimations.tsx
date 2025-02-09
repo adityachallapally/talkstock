@@ -1,4 +1,5 @@
-import React, { CSSProperties } from 'react';
+// HorizontalStockVideo/Tryingtomatchframeranimations.tsx
+import React, { CSSProperties, ReactNode } from 'react';
 import { interpolate, useCurrentFrame, useVideoConfig, Easing } from 'remotion';
 
 type AnimationType = 'text' | 'word' | 'character' | 'line';
@@ -111,7 +112,6 @@ const ANIMATION_VARIANTS: Record<
       transform: 'translateY(20px)',
     },
   },
-  // "Slot drop" with fade + an ease-out curve
   clipDropIn: {
     hidden: {
       opacity: 0,
@@ -126,22 +126,20 @@ const ANIMATION_VARIANTS: Record<
       transform: 'translateY(0%)',
     },
   },
-  // In your ANIMATION_VARIANTS:
   bigClipDropIn: {
     hidden: {
       opacity: 0,
-      transform: 'translateY(-100%) scale(2)', // Start off-screen, scaled up
+      transform: 'translateY(-100%) scale(2)',
     },
     show: {
       opacity: 1,
-      transform: 'translateY(0%) scale(2)',    // Animate in, still large
+      transform: 'translateY(0%) scale(2)',
     },
     exit: {
       opacity: 1,
-      transform: 'translateY(0%) scale(1)',    // End at normal scale
+      transform: 'translateY(0%) scale(1)',
     },
   },
-
 };
 
 interface RemotionTextAnimateProps {
@@ -155,13 +153,11 @@ interface RemotionTextAnimateProps {
   entranceDurationInFrames: number;
   showDurationInFrames: number;
   exitDurationInFrames: number;
+  xOffset?: number; // Added for multi-instance positioning
+  yOffset?: number; // Added for multi-instance positioning
+  style?: CSSProperties; //for the text styling,
 }
 
-/**
- * RemotionTextAnimate
- * - Adds an EASE-OUT curve during the entrance to give a more natural
- *   "drop" feel (letters start quickly, slow as they arrive).
- */
 export const RemotionTextAnimate: React.FC<RemotionTextAnimateProps> = ({
   children,
   as = 'p',
@@ -173,12 +169,14 @@ export const RemotionTextAnimate: React.FC<RemotionTextAnimateProps> = ({
   entranceDurationInFrames,
   showDurationInFrames,
   exitDurationInFrames,
+  xOffset = 0, // Default offset to 0
+  yOffset = 0, // Default offset to 0
+  style,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const staggerFrames = staggerTimings[by] * fps;
 
-  // Split text
   let segments: string[] = [];
   switch (by) {
     case 'word':
@@ -198,7 +196,6 @@ export const RemotionTextAnimate: React.FC<RemotionTextAnimateProps> = ({
 
   const { hidden, show, exit } = ANIMATION_VARIANTS[animation];
 
-  // Helper: Interpolate between from/to style objects
   const interpolateStyle = (
     from: CSSProperties,
     to: CSSProperties,
@@ -206,12 +203,10 @@ export const RemotionTextAnimate: React.FC<RemotionTextAnimateProps> = ({
   ): CSSProperties => {
     const style: CSSProperties = {};
 
-    // Opacity
     if (typeof from.opacity === 'number' && typeof to.opacity === 'number') {
       style.opacity = interpolate(progress, [0, 1], [from.opacity, to.opacity]);
     }
 
-    // filter: blur(...)
     if (from.filter && to.filter) {
       const fromBlurMatch = /blur\(([\d.]+)px\)/.exec(from.filter as string);
       const toBlurMatch = /blur\(([\d.]+)px\)/.exec(to.filter as string);
@@ -228,7 +223,6 @@ export const RemotionTextAnimate: React.FC<RemotionTextAnimateProps> = ({
       style.filter = progress === 1 ? to.filter : undefined;
     }
 
-    // transform
     const parseTransform = (transformStr?: string) => {
       const result: Record<string, number> = {
         translateX: 0,
@@ -261,12 +255,12 @@ export const RemotionTextAnimate: React.FC<RemotionTextAnimateProps> = ({
     const currentTranslateX = interpolate(
       progress,
       [0, 1],
-      [fromT.translateX, toT.translateX]
+      [fromT.translateX + xOffset, toT.translateX + xOffset] // Add xOffset
     );
     const currentTranslateY = interpolate(
       progress,
       [0, 1],
-      [fromT.translateY, toT.translateY]
+      [fromT.translateY + yOffset, toT.translateY + yOffset] // Add yOffset
     );
     const currentScale = interpolate(progress, [0, 1], [fromT.scale, toT.scale]);
 
@@ -275,9 +269,8 @@ export const RemotionTextAnimate: React.FC<RemotionTextAnimateProps> = ({
       transformPieces.push(`translateX(${currentTranslateX}px)`);
     }
     if (currentTranslateY !== 0) {
-      // Keep px or % if originally used
       const suffix =
-        (from.transform?.includes('%') || to.transform?.includes('%'))
+        from.transform?.includes('%') || to.transform?.includes('%')
           ? '%'
           : 'px';
       transformPieces.push(`translateY(${currentTranslateY}${suffix})`);
@@ -293,7 +286,6 @@ export const RemotionTextAnimate: React.FC<RemotionTextAnimateProps> = ({
     return style;
   };
 
-  // Determine style for each segment based on timeline
   const getSegmentStyle = (i: number): CSSProperties => {
     const segmentEntranceStart = entranceStartFrame + i * staggerFrames;
     const segmentEntranceEnd = segmentEntranceStart + entranceDurationInFrames;
@@ -301,43 +293,33 @@ export const RemotionTextAnimate: React.FC<RemotionTextAnimateProps> = ({
     const segmentExitEnd = segmentExitStart + exitDurationInFrames;
 
     if (frame < segmentEntranceStart) {
-      // not yet started => hidden
       return hidden;
     }
 
-    // during entrance
     if (frame < segmentEntranceEnd) {
-      // Calculate a progress in [0..1]
       const rawProgress = (frame - segmentEntranceStart) / entranceDurationInFrames;
-      // Ease out: the letter starts quickly and slows near the end
       const easedProgress = Easing.out(Easing.quad)(rawProgress);
       return interpolateStyle(hidden, show, easedProgress);
     }
 
-    // fully shown
     if (frame < segmentExitStart) {
       return show;
     }
 
-    // exit
     if (frame < segmentExitEnd) {
       const rawExitProgress = (frame - segmentExitStart) / exitDurationInFrames;
-      // You could also ease here if you want a fade-out that isn't purely linear
       return interpolateStyle(show, exit, rawExitProgress);
     }
 
-    // after exit => exit style
     return exit;
   };
 
   const Container = as;
 
   return (
-    <Container className={className} style={{ whiteSpace: 'pre-wrap' }}>
+    <Container className={className} style={{ whiteSpace: 'pre-wrap', ...style }}>
       {segments.map((segment, i) => {
         const style = getSegmentStyle(i);
-
-        // Overflow hidden ensures the letter doesn't appear above the "slot"
         const wrapperStyle: React.CSSProperties = {
           display: by === 'line' ? 'block' : 'inline-block',
           overflow: 'hidden',
@@ -361,4 +343,149 @@ export const RemotionTextAnimate: React.FC<RemotionTextAnimateProps> = ({
       })}
     </Container>
   );
+};
+
+
+interface ScaleDownProps {
+    children: ReactNode;
+    startFrame: number;
+    duration: number;
+}
+
+// Component for scaling down after bigClipDropIn
+export const ScaleDown: React.FC<ScaleDownProps> = ({ children, startFrame, duration }) => {
+    const frame = useCurrentFrame();
+
+    const scale = interpolate(
+        frame,
+        [startFrame, startFrame + duration],
+        [2, 1],
+        {
+            extrapolateLeft: 'clamp',
+            extrapolateRight: 'clamp',
+        }
+    );
+
+    return (
+        <div style={{ transform: `scale(${scale})`, transformOrigin: 'center' }}>
+            {children}
+        </div>
+    );
+};
+
+
+interface GlitchTextProps {
+  words: string[];
+  startFrame: number;
+  duration: number;
+}
+
+//very basic glitch component.
+export const GlitchText: React.FC<GlitchTextProps> = ({ words, startFrame, duration }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+
+  if (frame < startFrame || frame >= startFrame + duration) {
+    return null; // Don't render anything outside the specified range
+  }
+
+  const glitchIndex = Math.floor(interpolate(frame, [startFrame, startFrame+duration], [0, words.length], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp'
+  }))
+
+  return (
+    <RemotionTextAnimate
+        children={words[glitchIndex]}
+        animation="clipDropIn"
+        entranceStartFrame={startFrame}
+        entranceDurationInFrames={duration}
+        showDurationInFrames={0}
+        exitDurationInFrames={0}
+        by="word"
+    />
+  );
+};
+
+
+interface HighlightBoxProps {
+  children: ReactNode;
+  startFrame: number;
+  endFrame: number;
+  color: string;
+}
+
+//simple highlight component.
+export const HighlightBox: React.FC<HighlightBoxProps> = ({ children, startFrame, endFrame, color }) => {
+  const frame = useCurrentFrame();
+
+  if (frame < startFrame || frame >= endFrame) {
+    return <>{children}</>; // Render children directly if outside the highlight range
+  }
+
+    const opacity = interpolate(
+        frame,
+        [startFrame, endFrame],
+        [0, 1],
+        {
+            extrapolateLeft: 'clamp',
+            extrapolateRight: 'clamp',
+        }
+    );
+
+  return (
+    <div style={{ position: 'relative', display: 'inline-block' }}>
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: color,
+          opacity: opacity, // Control opacity for fade-in/out if needed
+          zIndex: 1, // Ensure the highlight is behind the text.  Adjust as needed.
+        }}
+      />
+      <div style={{ position: 'relative', zIndex: 2 }}>{children}</div>
+    </div>
+  );
+};
+
+//MultiInstanceText component to handle repetition.
+interface MultiInstanceTextProps {
+    instances: {
+        text: string;
+        startFrame: number;
+        endFrame: number;
+        xOffset: number;
+        yOffset: number;
+        id: number;
+    }[];
+}
+export const MultiInstanceText: React.FC<MultiInstanceTextProps> = ({ instances }) => {
+    const frame = useCurrentFrame();
+
+    const filteredInstances = instances.filter(
+        (instance) => frame >= instance.startFrame && frame < instance.endFrame
+    );
+
+    return (
+        <>
+            {filteredInstances.map((instance) => (
+                <RemotionTextAnimate
+                    key={instance.id}
+                    children={instance.text}
+                    animation="clipDropIn"
+                    entranceStartFrame={instance.startFrame}
+                    entranceDurationInFrames={15}
+                    showDurationInFrames={instance.endFrame - instance.startFrame}
+                    exitDurationInFrames={0}
+                    xOffset={instance.xOffset}
+                    yOffset={instance.yOffset}
+                    by="word"
+                />
+            ))}
+        </>
+    );
 };
