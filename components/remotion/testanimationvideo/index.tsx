@@ -3,6 +3,9 @@ import { BigTextReveal } from '../HorizontalStockVideo/BigTextReveal';
 import { CurtainTextReveal } from '../HorizontalStockVideo/CurtainTextReveal';
 
 export const TestAnimationComposition: React.FC = () => {
+  const commonExitStartFrame = 90;  // Define a common exit start frame
+  const commonExitDuration = 15;    // Define a common exit duration
+
   return (
     <div style={{
       width: '100%',
@@ -28,14 +31,18 @@ export const TestAnimationComposition: React.FC = () => {
           scaleDuration={45}
           initialScale={3}
           className="text-9xl font-bold"
+          exitStartFrame={commonExitStartFrame+30}
+          exitDuration={commonExitDuration}
+          exitAnimation="fadeDown"
         />
 
         <RemotionTextAnimate
-          animation="clipDropIn"
+          entranceAnimation="clipDropIn"
+          exitAnimation="fadeDown"
           entranceStartFrame={45}
           entranceDurationInFrames={30}
-          showDurationInFrames={60}
-          exitDurationInFrames={15}
+          showDurationInFrames={commonExitStartFrame - 45}
+          exitDurationInFrames={commonExitDuration}
           by="character"
           className="text-9xl font-bold"
           style={{
@@ -47,11 +54,12 @@ export const TestAnimationComposition: React.FC = () => {
         </RemotionTextAnimate>
 
         <RemotionTextAnimate
-          animation="clipDropIn"
+          entranceAnimation="clipDropIn"
+          exitAnimation="fadeDown"
           entranceStartFrame={75}
           entranceDurationInFrames={30}
-          showDurationInFrames={60}
-          exitDurationInFrames={15}
+          showDurationInFrames={commonExitStartFrame - 75}
+          exitDurationInFrames={commonExitDuration}
           by="character"
           className="text-9xl font-bold"
           style={{

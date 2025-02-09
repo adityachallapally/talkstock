@@ -8,6 +8,9 @@ interface CurtainTextRevealProps {
   scaleDuration: number;
   initialScale?: number;
   className?: string;
+  exitStartFrame?: number;
+  exitDuration?: number;
+  exitAnimation?: 'fadeDown' | 'fadeUp' | 'fadeOut';
 }
 
 export const CurtainTextReveal: React.FC<CurtainTextRevealProps> = ({
@@ -17,6 +20,9 @@ export const CurtainTextReveal: React.FC<CurtainTextRevealProps> = ({
   scaleDuration,
   initialScale = 5,
   className = 'text-6xl font-bold',
+  exitStartFrame,
+  exitDuration = 15,
+  exitAnimation = 'fadeDown',
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -75,6 +81,38 @@ export const CurtainTextReveal: React.FC<CurtainTextRevealProps> = ({
     }
   );
 
+  // Add exit animation calculations
+  const isExiting = exitStartFrame && frame >= exitStartFrame;
+  const exitProgress = isExiting
+    ? interpolate(
+        frame - exitStartFrame,
+        [0, exitDuration],
+        [0, 1],
+        {
+          extrapolateLeft: 'clamp',
+          extrapolateRight: 'clamp',
+        }
+      )
+    : 0;
+
+  // Calculate exit transforms based on animation type
+  const getExitTransform = (baseTransform: string) => {
+    if (!isExiting) return baseTransform;
+
+    const yOffset = exitAnimation === 'fadeDown' 
+      ? interpolate(exitProgress, [0, 1], [0, 20])
+      : exitAnimation === 'fadeUp'
+      ? interpolate(exitProgress, [0, 1], [0, -20])
+      : 0;
+
+    return `${baseTransform} translateY(${yOffset}px)`;
+  };
+
+  // Calculate exit opacity
+  const exitOpacity = isExiting
+    ? interpolate(exitProgress, [0, 1], [1, 0])
+    : 1;
+
   return (
     <div
       style={{
@@ -85,6 +123,7 @@ export const CurtainTextReveal: React.FC<CurtainTextRevealProps> = ({
         perspective: '1000px',
         overflow: 'visible',
         position: 'relative',
+        opacity: exitOpacity, // Apply exit opacity to entire component
       }}
     >
       {/* Hidden div to measure text width */}
@@ -111,9 +150,9 @@ export const CurtainTextReveal: React.FC<CurtainTextRevealProps> = ({
           height: '3px',
           background: 'linear-gradient(90deg, transparent 0%, white 20%, white 80%, transparent 100%)',
           width: measureDiv.current?.offsetWidth || 'auto',
-          transform: `scale(${currentScale}) translateY(-0.6em)`,
+          transform: getExitTransform(`scale(${currentScale}) translateY(-0.6em)`),
           transformOrigin: 'center center',
-          opacity: curtainOpacity,
+          opacity: curtainOpacity * exitOpacity, // Combine with exit opacity
           boxShadow: '0 0 8px rgba(255, 255, 255, 0.5)',
         }}
       />
@@ -124,7 +163,7 @@ export const CurtainTextReveal: React.FC<CurtainTextRevealProps> = ({
           justifyContent: 'center',
           alignItems: 'center',
           gap: `${letterSpacing}em`,
-          transform: `scale(${currentScale})`,
+          transform: getExitTransform(`scale(${currentScale})`),
           transformOrigin: 'center center',
         }}
       >
@@ -183,11 +222,11 @@ export const CurtainTextReveal: React.FC<CurtainTextRevealProps> = ({
               style={{
                 fontWeight: 'bold',
                 lineHeight: 1,
-                transform: `translateY(${yOffset}em) rotate(${rotation}deg)`,
+                transform: getExitTransform(`translateY(${yOffset}em) rotate(${rotation}deg)`),
                 display: 'inline-block',
                 position: 'relative',
                 whiteSpace: 'nowrap',
-                opacity: isTimeToShow ? opacity : 0,
+                opacity: isTimeToShow ? opacity * exitOpacity : 0, // Combine with exit opacity
                 textShadow: '0 0 10px rgba(255, 255, 255, 0.3)',
               }}
             >

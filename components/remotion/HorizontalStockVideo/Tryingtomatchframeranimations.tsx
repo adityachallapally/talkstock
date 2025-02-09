@@ -17,7 +17,8 @@ type AnimationVariant =
   | 'ml16'
   | 'dropIn'
   | 'clipDropIn'
-  | 'bigClipDropIn';
+  | 'bigClipDropIn'
+  | 'fadeDown';
 
 const staggerTimings: Record<AnimationType, number> = {
   text: 0.06,
@@ -140,6 +141,20 @@ const ANIMATION_VARIANTS: Record<
       transform: 'translateY(0%) scale(1)',
     },
   },
+  fadeDown: {
+    hidden: {
+      opacity: 0,
+      transform: 'translateY(0px)',
+    },
+    show: {
+      opacity: 1,
+      transform: 'translateY(0px)',
+    },
+    exit: {
+      opacity: 0,
+      transform: 'translateY(20px)',
+    },
+  },
 };
 
 interface RemotionTextAnimateProps {
@@ -156,6 +171,8 @@ interface RemotionTextAnimateProps {
   xOffset?: number; // Added for multi-instance positioning
   yOffset?: number; // Added for multi-instance positioning
   style?: CSSProperties; //for the text styling,
+  entranceAnimation?: AnimationVariant;
+  exitAnimation?: AnimationVariant;
 }
 
 export const RemotionTextAnimate: React.FC<RemotionTextAnimateProps> = ({
@@ -172,6 +189,8 @@ export const RemotionTextAnimate: React.FC<RemotionTextAnimateProps> = ({
   xOffset = 0, // Default offset to 0
   yOffset = 0, // Default offset to 0
   style,
+  entranceAnimation,
+  exitAnimation,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -194,7 +213,11 @@ export const RemotionTextAnimate: React.FC<RemotionTextAnimateProps> = ({
       break;
   }
 
-  const { hidden, show, exit } = ANIMATION_VARIANTS[animation];
+  const chosenEntrance = entranceAnimation || animation;
+  const chosenExit = exitAnimation || animation;
+
+  const { hidden: entranceHidden, show: entranceShow } = ANIMATION_VARIANTS[chosenEntrance];
+  const { show: exitShow, exit: exitExit } = ANIMATION_VARIANTS[chosenExit];
 
   const interpolateStyle = (
     from: CSSProperties,
@@ -293,25 +316,26 @@ export const RemotionTextAnimate: React.FC<RemotionTextAnimateProps> = ({
     const segmentExitEnd = segmentExitStart + exitDurationInFrames;
 
     if (frame < segmentEntranceStart) {
-      return hidden;
+      return entranceHidden;
     }
 
     if (frame < segmentEntranceEnd) {
       const rawProgress = (frame - segmentEntranceStart) / entranceDurationInFrames;
       const easedProgress = Easing.out(Easing.quad)(rawProgress);
-      return interpolateStyle(hidden, show, easedProgress);
+      return interpolateStyle(entranceHidden, entranceShow, easedProgress);
     }
 
     if (frame < segmentExitStart) {
-      return show;
+      return entranceShow;
     }
 
     if (frame < segmentExitEnd) {
       const rawExitProgress = (frame - segmentExitStart) / exitDurationInFrames;
-      return interpolateStyle(show, exit, rawExitProgress);
+      const easedExitProgress = Easing.out(Easing.quad)(rawExitProgress);
+      return interpolateStyle(exitShow, exitExit, easedExitProgress);
     }
 
-    return exit;
+    return exitExit;
   };
 
   const Container = as;
