@@ -128,12 +128,12 @@ const ANIMATION_VARIANTS: Record<
   },
   bigClipDropIn: {
     hidden: {
-      opacity: 0,
-      transform: 'translateY(-100%) scale(2)',
+      opacity: 1,
+      transform: 'translateY(-150%) scale(3)',
     },
     show: {
       opacity: 1,
-      transform: 'translateY(0%) scale(2)',
+      transform: 'translateY(0%) scale(3)',
     },
     exit: {
       opacity: 1,
