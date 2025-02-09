@@ -98,7 +98,9 @@ export const CurtainTextReveal: React.FC<CurtainTextRevealProps> = ({
         }}
       >
         {text.split('').map((char, index) => (
-          <div key={index} className={className}>{char}</div>
+          <div key={index} className={className}>
+            {char === ' ' ? '\u00A0' : char}
+          </div>
         ))}
       </div>
 
@@ -189,7 +191,7 @@ export const CurtainTextReveal: React.FC<CurtainTextRevealProps> = ({
                 textShadow: '0 0 10px rgba(255, 255, 255, 0.3)',
               }}
             >
-              {char}
+              {char === ' ' ? '\u00A0' : char}
             </div>
           );
         })}
