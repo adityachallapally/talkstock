@@ -17,6 +17,7 @@ export const TestAnimationComposition: React.FC = () => {
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
+        height: '50vh',
       }}>
         <BigTextReveal
           text="EARN A"

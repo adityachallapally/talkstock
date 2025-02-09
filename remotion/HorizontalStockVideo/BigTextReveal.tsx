@@ -67,7 +67,8 @@ export const BigTextReveal: React.FC<BigTextRevealProps> = ({
         justifyContent: 'center',
         alignItems: 'center',
         perspective: '1000px',
-        overflow: 'hidden',
+        overflow: 'visible',
+        position: 'relative',
       }}
     >
       <div
@@ -78,6 +79,7 @@ export const BigTextReveal: React.FC<BigTextRevealProps> = ({
           gap: `${letterSpacing}em`,
           transform: `scale(${currentScale})`,
           transformOrigin: 'center center',
+          position: 'absolute',
         }}
       >
         {text.split('').map((char, index) => {
@@ -106,8 +108,9 @@ export const BigTextReveal: React.FC<BigTextRevealProps> = ({
           return (
             <div
               key={index}
-              className={className}  // Just use the string directly
+              className={className}
               style={{
+                fontWeight: 'bold',
                 lineHeight: 1,
                 transform: `translateY(${yOffset}vh)`,
                 display: 'inline-block',
@@ -122,4 +125,4 @@ export const BigTextReveal: React.FC<BigTextRevealProps> = ({
       </div>
     </div>
   );
-}; 
+};
