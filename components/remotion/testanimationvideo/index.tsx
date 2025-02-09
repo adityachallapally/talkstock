@@ -18,15 +18,16 @@ export const TestAnimationComposition: React.FC = () => {
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        height: '50vh',
+        height: '100%',
+        justifyContent: 'center',
       }}>
         <CurtainTextReveal
           text="EARN A"
           startFrame={0}
           dropDuration={30}
           scaleDuration={45}
-          initialScale={5}
-          className="text-2xlfont-bold"
+          initialScale={3}
+          className="text-9xl font-bold"
         />
 
         <RemotionTextAnimate
@@ -36,11 +37,10 @@ export const TestAnimationComposition: React.FC = () => {
           showDurationInFrames={60}
           exitDurationInFrames={15}
           by="character"
-          className="text-2xl font-bold"
+          className="text-9xl font-bold"
           style={{
             position: 'relative',
             zIndex: 1,
-            marginTop: '-0.5rem',
           }}
         >
           GRADUATE
@@ -53,11 +53,10 @@ export const TestAnimationComposition: React.FC = () => {
           showDurationInFrames={60}
           exitDurationInFrames={15}
           by="character"
-          className="text-2xl font-bold"
+          className="text-9xl font-bold"
           style={{
             position: 'relative',
             zIndex: 1,
-            marginTop: '-0.5rem',
           }}
         >
           CERTIFICATE
