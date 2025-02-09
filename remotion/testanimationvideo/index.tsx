@@ -1,5 +1,6 @@
 import { RemotionTextAnimate } from '../HorizontalStockVideo/Tryingtomatchframeranimations';
 import { BigTextReveal } from '../HorizontalStockVideo/BigTextReveal';
+import { CurtainTextReveal } from '../HorizontalStockVideo/CurtainTextReveal';
 
 export const TestAnimationComposition: React.FC = () => {
   return (
@@ -19,13 +20,13 @@ export const TestAnimationComposition: React.FC = () => {
         alignItems: 'center',
         height: '50vh',
       }}>
-        <BigTextReveal
+        <CurtainTextReveal
           text="EARN A"
           startFrame={0}
           dropDuration={30}
           scaleDuration={45}
           initialScale={5}
-          className="text-6xl font-bold"
+          className="text-2xlfont-bold"
         />
 
         <RemotionTextAnimate
@@ -35,7 +36,7 @@ export const TestAnimationComposition: React.FC = () => {
           showDurationInFrames={60}
           exitDurationInFrames={15}
           by="character"
-          className="text-6xl font-bold"
+          className="text-2xl font-bold"
           style={{
             position: 'relative',
             zIndex: 1,
@@ -52,7 +53,7 @@ export const TestAnimationComposition: React.FC = () => {
           showDurationInFrames={60}
           exitDurationInFrames={15}
           by="character"
-          className="text-6xl font-bold"
+          className="text-2xl font-bold"
           style={{
             position: 'relative',
             zIndex: 1,
