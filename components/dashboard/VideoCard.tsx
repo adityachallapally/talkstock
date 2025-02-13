@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Player } from '@remotion/player';
-import { CaptionedVideo } from '@/remotion/CaptionedVideo';
+import { CaptionedVideo } from '@/components/remotion/CaptionedVideo';
 import { renderVideo } from '@/lambda/api';
 import { useRendering } from '@/helpers/use-rendering';
 import { COMP_NAME } from '@/types/constants';

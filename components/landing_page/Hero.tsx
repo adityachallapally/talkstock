@@ -10,6 +10,7 @@ import { VideoSchema, VideoSchemaType } from '@/lib/schemas'
 import { createremotionVideo } from "@/lib/videoActions" 
 import Image from 'next/image'
 import VideoCounter from '@/components/landing_page/VideoCounter'
+import { UploadVideoPopup } from '@/components/landing_page/UploadVideoPopup'
 
 const exampleTopics = [
   "How do trees grow?",
@@ -30,6 +31,7 @@ interface HeroProps {
 
 const Hero: React.FC<HeroProps> = ({ selectedTopic }) => {
   const [shadowActive, setShadowActive] = useState(false)
+  const [isUploadOpen, setIsUploadOpen] = useState(false)
   const router = useRouter()
 
   const form = useForm<VideoSchemaType>({
@@ -96,6 +98,13 @@ const Hero: React.FC<HeroProps> = ({ selectedTopic }) => {
             >
               Generate video
             </Button>
+            <Button
+              className={`${shadowClass} rounded-full transition-shadow duration-300 whitespace-nowrap`}
+              variant="outline"
+              onClick={() => setIsUploadOpen(true)}
+            >
+              Upload video
+            </Button>
           </div>
         </div>
       </div>
@@ -108,6 +117,10 @@ const Hero: React.FC<HeroProps> = ({ selectedTopic }) => {
           />
         </div>
       </div>
+      <UploadVideoPopup 
+        isOpen={isUploadOpen}
+        onClose={() => setIsUploadOpen(false)}
+      />
     </div>
   )
 }
