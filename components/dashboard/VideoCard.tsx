@@ -93,14 +93,11 @@ const VideoCard = ({ video }: { video: VideoData }) => {
     };
 
     useEffect(() => {
-        if (video.audioSrc && video.imageUrls && video.transcriptionSrc && video.durationInFrames) {
+        if (video.videoLink) {
             setVideoLoaded(true);
         } else {
             console.error('Missing video data:', {
-                audioSrc: video.audioSrc,
-                imageUrls: video.imageUrls,
-                transcriptionSrc: video.transcriptionSrc,
-                durationInFrames: video.durationInFrames
+                videoLink: video.videoLink
             });
             setVideoLoaded(false);
         }
@@ -118,24 +115,32 @@ const VideoCard = ({ video }: { video: VideoData }) => {
                         <div className="space-y-4">
                             {videoLoaded ? (
                                 <>
-                                    <Player
-                                        component={CaptionedVideo}
-                                        inputProps={{
-                                            audioSrc: video.audioSrc,
-                                            images: video.imageUrls,
-                                            subtitlesSrc: video.transcriptionSrc,
-                                            durationInFrames: video.durationInFrames // Add this line
-                                        }}
-                                        durationInFrames={video.durationInFrames}
-                                        fps={30}
-                                        compositionHeight={1920}
-                                        compositionWidth={1080}
-                                        style={{
-                                            width: '100%',
-                                            aspectRatio: '9/16',
-                                        }}
-                                        controls
-                                    />
+                                    {video.videoLink ? (
+                                        <video
+                                            src={video.videoLink}
+                                            controls
+                                            className="w-full aspect-[9/16] rounded-lg"
+                                        />
+                                    ) : (
+                                        <Player
+                                            component={CaptionedVideo}
+                                            inputProps={{
+                                                audioSrc: video.audioSrc,
+                                                images: video.imageUrls,
+                                                subtitlesSrc: video.transcriptionSrc,
+                                                durationInFrames: video.durationInFrames || 300
+                                            }}
+                                            durationInFrames={video.durationInFrames || 300}
+                                            fps={30}
+                                            compositionHeight={1920}
+                                            compositionWidth={1080}
+                                            style={{
+                                                width: '100%',
+                                                aspectRatio: '9/16',
+                                            }}
+                                            controls
+                                        />
+                                    )}
                                     {state.status === "done" && (
                                         <Button className="w-full" onClick={() => window.open(state.url, '_blank')}>
                                             Download Video
