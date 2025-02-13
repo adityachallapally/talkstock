@@ -1,5 +1,6 @@
 import React from 'react';
 import { spring, useCurrentFrame, useVideoConfig, interpolate } from 'remotion';
+import { FadeDown } from '../animations/ExitAnimations';
 
 interface CurtainTextRevealProps {
   text: string;
@@ -113,7 +114,7 @@ export const CurtainTextReveal: React.FC<CurtainTextRevealProps> = ({
     ? interpolate(exitProgress, [0, 1], [1, 0])
     : 1;
 
-  return (
+  const content = (
     <div
       style={{
         width: '100%',
@@ -123,7 +124,7 @@ export const CurtainTextReveal: React.FC<CurtainTextRevealProps> = ({
         perspective: '1000px',
         overflow: 'visible',
         position: 'relative',
-        opacity: exitOpacity, // Apply exit opacity to entire component
+        opacity: exitOpacity,
       }}
     >
       {/* Hidden div to measure text width */}
@@ -165,6 +166,8 @@ export const CurtainTextReveal: React.FC<CurtainTextRevealProps> = ({
           gap: `${letterSpacing}em`,
           transform: getExitTransform(`scale(${currentScale})`),
           transformOrigin: 'center center',
+          position: 'relative',
+          width: '100%',
         }}
       >
         {text.split('').map((char, index) => {
@@ -226,7 +229,7 @@ export const CurtainTextReveal: React.FC<CurtainTextRevealProps> = ({
                 display: 'inline-block',
                 position: 'relative',
                 whiteSpace: 'nowrap',
-                opacity: isTimeToShow ? opacity * exitOpacity : 0, // Combine with exit opacity
+                opacity: isTimeToShow ? opacity : 0,
                 textShadow: '0 0 10px rgba(255, 255, 255, 0.3)',
               }}
             >
@@ -237,4 +240,33 @@ export const CurtainTextReveal: React.FC<CurtainTextRevealProps> = ({
       </div>
     </div>
   );
+
+  return exitStartFrame && frame >= exitStartFrame ? (
+    <div style={{ 
+      width: '100%',
+      display: 'flex',
+      justifyContent: 'center',
+      position: 'relative'
+    }}>
+      {exitAnimation === 'fadeDown' && (
+        <FadeDown
+          frame={frame}
+          startFrame={exitStartFrame}
+          duration={exitDuration}
+        >
+          {content}
+        </FadeDown>
+      )}
+      {exitAnimation === 'fadeUp' && (
+        <FadeUp
+          frame={frame}
+          startFrame={exitStartFrame}
+          duration={exitDuration}
+        >
+          {content}
+        </FadeUp>
+      )}
+      {/* ... other exit animations */}
+    </div>
+  ) : content;
 }; 

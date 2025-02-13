@@ -1,6 +1,7 @@
 // HorizontalStockVideo/Tryingtomatchframeranimations.tsx
 import React, { CSSProperties, ReactNode } from 'react';
 import { interpolate, useCurrentFrame, useVideoConfig, Easing } from 'remotion';
+import { FadeDown } from '../animations/ExitAnimations';
 
 type AnimationType = 'text' | 'word' | 'character' | 'line';
 type AnimationVariant =
@@ -340,28 +341,33 @@ export const RemotionTextAnimate: React.FC<RemotionTextAnimateProps> = ({
 
   const Container = as;
 
+  const renderContent = (style: CSSProperties, i: number) => (
+    <span className={segmentClassName} style={style}>
+      {segments[i]}
+    </span>
+  );
+
   return (
     <Container className={className} style={{ whiteSpace: 'pre-wrap', ...style }}>
       {segments.map((segment, i) => {
-        const style = getSegmentStyle(i);
-        const wrapperStyle: React.CSSProperties = {
-          display: by === 'line' ? 'block' : 'inline-block',
-          overflow: 'hidden',
-          verticalAlign: 'bottom',
-          whiteSpace: 'pre',
-        };
+        const segmentExitStart = entranceStartFrame + entranceDurationInFrames + showDurationInFrames;
+        
+        const content = renderContent(getSegmentStyle(i), i);
 
         return (
-          <span key={`${by}-${i}-${segment}`} style={wrapperStyle}>
-            <span
-              className={segmentClassName}
-              style={{
-                display: 'inline-block',
-                ...style,
-              }}
-            >
-              {segment}
-            </span>
+          <span 
+            key={`${by}-${i}-${segment}`}
+            style={{ display: 'inline-block' }}
+          >
+            {frame >= segmentExitStart && exitAnimation === 'fadeDown' ? (
+              <FadeDown
+                frame={frame}
+                startFrame={segmentExitStart}
+                duration={exitDurationInFrames}
+              >
+                {content}
+              </FadeDown>
+            ) : content}
           </span>
         );
       })}
