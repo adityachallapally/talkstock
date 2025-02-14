@@ -175,7 +175,8 @@ export const CaptionedVideo: React.FC<{
 	src: string;
 	overlays?: OverlayConfig[];
 	transcriptionUrl?: string;
-}> = ({src, overlays = [], transcriptionUrl}) => {
+	showCaptions?: boolean;
+}> = ({src, overlays = [], transcriptionUrl, showCaptions = true}) => {
 	const [subtitles, setSubtitles] = useState<SubtitleProp[]>([]);
 	const [handle] = useState(() => delayRender());
 	const {fps} = useVideoConfig();
@@ -235,7 +236,7 @@ export const CaptionedVideo: React.FC<{
 				</Sequence>
 			))}
 
-			{subtitles.map((subtitle, index) => {
+			{showCaptions && subtitles.map((subtitle, index) => {
 				const nextSubtitle = subtitles[index + 1] ?? null;
 				const subtitleStartFrame = Math.round((subtitle.startMs / 1000) * fps);
 				const subtitleEndFrame = Math.round((subtitle.endMs / 1000) * fps);

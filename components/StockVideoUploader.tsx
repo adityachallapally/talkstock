@@ -7,6 +7,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Player } from '@remotion/player';
 import { CaptionedVideo } from '@/components/remotion/CaptionedVideo';
 import { OverlayConfig } from '@/types/constants';
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 // Add type declaration for webkitAudioContext
 declare global {
@@ -26,6 +28,7 @@ interface VideoVariant {
 export function StockVideoUploader() {
   const [isUploading, setIsUploading] = useState(false);
   const [videoVariants, setVideoVariants] = useState<VideoVariant[]>([]);
+  const [showCaptions, setShowCaptions] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -150,32 +153,46 @@ export function StockVideoUploader() {
             disabled={isUploading}
             className="hidden"
           />
+          
           {videoVariants.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {videoVariants.map((variant, index) => (
-                <div key={index} className="space-y-2">
-                  <h3 className="text-lg font-semibold">{variant.provider}</h3>
-                  <Player
-                    component={CaptionedVideo}
-                    inputProps={{
-                      src: variant.src,
-                      overlays: variant.overlays,
-                      transcriptionUrl: variant.transcriptionUrl
-                    }}
-                    durationInFrames={variant.durationInFrames}
-                    fps={30}
-                    compositionHeight={1920}
-                    compositionWidth={1080}
-                    style={{
-                      width: '100%',
-                      aspectRatio: '9/16',
-                    }}
-                    controls
-                  />
-                </div>
-              ))}
-            </div>
+            <>
+              <div className="flex items-center space-x-2 mb-4">
+                <Switch
+                  id="captions"
+                  checked={showCaptions}
+                  onCheckedChange={setShowCaptions}
+                />
+                <Label htmlFor="captions">Show Captions</Label>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {videoVariants.map((variant, index) => (
+                  <div key={index} className="space-y-2">
+                    <h3 className="text-lg font-semibold">{variant.provider}</h3>
+                    <Player
+                      component={CaptionedVideo}
+                      inputProps={{
+                        src: variant.src,
+                        overlays: variant.overlays,
+                        transcriptionUrl: variant.transcriptionUrl,
+                        showCaptions
+                      }}
+                      durationInFrames={variant.durationInFrames}
+                      fps={30}
+                      compositionHeight={1920}
+                      compositionWidth={1080}
+                      style={{
+                        width: '100%',
+                        aspectRatio: '9/16',
+                      }}
+                      controls
+                    />
+                  </div>
+                ))}
+              </div>
+            </>
           )}
+
           <Button 
             onClick={handleButtonClick}
             disabled={isUploading}
