@@ -105,14 +105,16 @@ export function StockVideoUploader() {
       const data = await response.json();
       
       if (data.success) {
-        // Create a variant for each provider's overlays
-        const variants = data.overlaysByProvider.map((overlays: OverlayConfig[], index: number) => ({
-          src: data.src,
-          overlays,
-          durationInFrames,
-          transcriptionUrl: data.transcriptionUrl,
-          provider: overlays[0]?.provider || `Provider ${index + 1}`
-        }));
+        // Create a variant for each provider's overlays but only use Pexels
+        const variants = data.overlaysByProvider
+          .map((overlays: OverlayConfig[], index: number) => ({
+            src: data.src,
+            overlays,
+            durationInFrames,
+            transcriptionUrl: data.transcriptionUrl,
+            provider: overlays[0]?.provider || `Provider ${index + 1}`
+          }))
+          .filter(variant => variant.provider === 'Pexels'); // Only keep Pexels variants
 
         setVideoVariants(variants);
         
@@ -165,10 +167,9 @@ export function StockVideoUploader() {
                 <Label htmlFor="captions">Show Captions</Label>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 {videoVariants.map((variant, index) => (
                   <div key={index} className="space-y-2">
-                    <h3 className="text-lg font-semibold">{variant.provider}</h3>
                     <Player
                       component={CaptionedVideo}
                       inputProps={{
@@ -183,6 +184,8 @@ export function StockVideoUploader() {
                       compositionWidth={1080}
                       style={{
                         width: '100%',
+                        maxWidth: '400px',
+                        margin: '0 auto',
                         aspectRatio: '9/16',
                       }}
                       controls

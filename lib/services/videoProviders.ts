@@ -1,5 +1,4 @@
 import { createClient, Videos } from 'pexels';
-import { getFirstPixabayVideoUrl } from './pixabay';
 
 const pexelsClient = createClient('V4GUX2DiZafEDUKHToyAhpJM2LD18BpU3WdkCvsi4TMX8BTSOH35wQJX');
 
@@ -41,9 +40,9 @@ export interface ProviderVideo {
 export const getAllProviderVideos = async (term: string): Promise<ProviderVideo[]> => {
   console.log('Fetching videos for term:', term);
   
+  // Only use Pexels provider
   const providers = [
     { name: 'Pexels', getVideo: getFirstPexelsVideoUrl },
-    { name: 'Pixabay', getVideo: getFirstPixabayVideoUrl },
   ];
 
   try {
