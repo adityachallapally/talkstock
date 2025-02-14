@@ -52,23 +52,6 @@ export function StockVideoUploader() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
-  const [isTranscriptDropdownOpen, setIsTranscriptDropdownOpen] = useState(false);
-  const transcriptDropdownOpenRef = useRef(false);
-
-  useEffect(() => {
-    transcriptDropdownOpenRef.current = isTranscriptDropdownOpen;
-  }, [isTranscriptDropdownOpen]);
-
-  useEffect(() => {
-    const onMouseDown = (e: MouseEvent) => {
-      if (transcriptDropdownOpenRef.current) return;
-      const transcriptDiv = document.getElementById('transcript-container');
-      if (transcriptDiv && transcriptDiv.contains(e.target as Node)) return;
-      handleClickAway();
-    };
-    document.addEventListener('mousedown', onMouseDown);
-    return () => document.removeEventListener('mousedown', onMouseDown);
-  }, []);
 
   const handleTextSelection = () => {
     const selection = window.getSelection();
@@ -405,6 +388,20 @@ export function StockVideoUploader() {
     console.log('Menu position set to:', { x: rect.left + (rect.width / 2), y: rect.bottom });
   };
 
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      const transcriptDiv = document.getElementById('transcript-container');
+      const transcriptDropdown = document.getElementById('transcript-dropdown');
+      if ((transcriptDiv && transcriptDiv.contains(e.target as Node)) ||
+          (transcriptDropdown && transcriptDropdown.contains(e.target as Node))) {
+        return;
+      }
+      handleClickAway();
+    };
+    document.addEventListener('click', onClick);
+    return () => document.removeEventListener('click', onClick);
+  }, []);
+
   return (
     <Card>
       <CardHeader>
@@ -525,40 +522,6 @@ export function StockVideoUploader() {
             Load Demo Content
           </Button>
         </div>
-
-        {/* B-Roll Menu */}
-        {menuPosition && clickedSegmentIndex !== null && (
-          <div id="transcript-dropdown" onMouseDown={(e) => e.stopPropagation()} style={{
-            position: 'fixed',
-            left: `${menuPosition.x}px`,
-            top: `${menuPosition.y}px`,
-            transform: 'translateX(-50%)',
-          }}>
-            <DropdownMenu onOpenChange={(open) => setIsTranscriptDropdownOpen(open)}>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline">Test Dropdown Menu</Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent id="transcript-dropdown-content" onMouseDown={(e) => e.stopPropagation()}>
-                <DropdownMenuItem 
-                  onSelect={() => {
-                    console.log('Test option 1 selected');
-                    alert('Test option 1 selected');
-                  }}
-                >
-                  Test Option 1
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onSelect={() => {
-                    console.log('Test option 2 selected');
-                    alert('Test option 2 selected');
-                  }}
-                >
-                  Test Option 2
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        )}
 
         {/* Search Assets Dialog */}
         {isSearchOpen && (
@@ -724,6 +687,35 @@ export function StockVideoUploader() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+        )}
+
+        {/* Update the transcript-dropdown container div by adding an onClick stopPropagation: */}
+        {menuPosition && clickedSegmentIndex !== null && (
+          <div id="transcript-dropdown" 
+               onMouseDown={(e) => e.stopPropagation()}
+               onClick={(e) => e.stopPropagation()}
+               style={{
+                 position: 'fixed',
+                 left: `${menuPosition.x}px`,
+                 top: `${menuPosition.y}px`,
+                 transform: 'translateX(-50%)',
+                 backgroundColor: 'white',
+                 border: '1px solid #ccc',
+                 borderRadius: '4px'
+               }}>
+            <div onClick={() => {
+                 console.log('Test option 1 selected');
+                 alert('Test option 1 selected');
+               }} style={{ cursor: 'pointer', padding: '8px' }}>
+                  Test Option 1
+            </div>
+            <div onClick={() => {
+                 console.log('Test option 2 selected');
+                 alert('Test option 2 selected');
+               }} style={{ cursor: 'pointer', padding: '8px' }}>
+                  Test Option 2
+            </div>
+          </div>
         )}
       </CardContent>
     </Card>
