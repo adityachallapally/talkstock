@@ -98,7 +98,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ 
       success: true,
       videoId: videoRecord.id,
-      videoUrl: videoRecord.originalVideoUrl,
+      src: videoRecord.originalVideoUrl,
       transcriptionUrl: transcriptionBlob.url,
       durationInFrames: Math.ceil(captions[captions.length - 1].endMs / (1000 / 30)), // Convert last caption end time to frames
       overlays,

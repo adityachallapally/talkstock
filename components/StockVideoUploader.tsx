@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Player } from '@remotion/player';
 import { CaptionedVideo } from '@/components/remotion/CaptionedVideo';
+import { OverlayConfig } from '@/types/constants';
 
 // Add type declaration for webkitAudioContext
 declare global {
@@ -17,10 +18,8 @@ declare global {
 export function StockVideoUploader() {
   const [isUploading, setIsUploading] = useState(false);
   const [videoData, setVideoData] = useState<{
-    audioSrc: string;
-    subtitlesSrc: string;
-    durationInFrames: number;
-    overlays: any[];
+    src: string;
+    overlays?: OverlayConfig[];
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -97,10 +96,8 @@ export function StockVideoUploader() {
       
       if (data.success) {
         setVideoData({
-          audioSrc: data.videoUrl,
-          subtitlesSrc: data.transcriptionUrl,
-          durationInFrames: data.durationInFrames,
-          overlays: data.overlays || []
+          src: data.src,
+          overlays: data.overlays
         });
         
         toast({
@@ -144,7 +141,7 @@ export function StockVideoUploader() {
             <Player
               component={CaptionedVideo}
               inputProps={videoData}
-              durationInFrames={videoData.durationInFrames}
+              durationInFrames={900} // Default duration, will be adjusted by the video
               fps={30}
               compositionHeight={1920}
               compositionWidth={1080}
