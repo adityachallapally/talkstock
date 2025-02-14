@@ -49,8 +49,26 @@ export function StockVideoUploader() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchResults, setSearchResults] = useState<{ videoSrc: string }[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const [isTranscriptDropdownOpen, setIsTranscriptDropdownOpen] = useState(false);
+  const transcriptDropdownOpenRef = useRef(false);
+
+  useEffect(() => {
+    transcriptDropdownOpenRef.current = isTranscriptDropdownOpen;
+  }, [isTranscriptDropdownOpen]);
+
+  useEffect(() => {
+    const onMouseDown = (e: MouseEvent) => {
+      if (transcriptDropdownOpenRef.current) return;
+      const transcriptDiv = document.getElementById('transcript-container');
+      if (transcriptDiv && transcriptDiv.contains(e.target as Node)) return;
+      handleClickAway();
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, []);
 
   const handleTextSelection = () => {
     const selection = window.getSelection();
@@ -79,15 +97,6 @@ export function StockVideoUploader() {
       setSelectedRange(null);
     }
   };
-
-  useEffect(() => {
-    document.addEventListener('mousedown', (e) => {
-      const transcriptDiv = document.getElementById('transcript-container');
-      if (transcriptDiv && !transcriptDiv.contains(e.target as Node)) {
-        handleClickAway();
-      }
-    });
-  }, []);
 
   const extractAudioFromVideo = async (videoFile: File): Promise<{ audioBlob: Blob, durationInFrames: number }> => {
     return new Promise((resolve, reject) => {
@@ -392,6 +401,7 @@ export function StockVideoUploader() {
       x: rect.left + (rect.width / 2),
       y: rect.bottom
     });
+    setIsMenuOpen(true);
     console.log('Menu position set to:', { x: rect.left + (rect.width / 2), y: rect.bottom });
   };
 
@@ -402,6 +412,33 @@ export function StockVideoUploader() {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
+          {/* Test Dropdown Menu */}
+          <div className="mb-4">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">Test Dropdown Menu</Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem 
+                  onSelect={() => {
+                    console.log('Test option 1 selected');
+                    alert('Test option 1 selected');
+                  }}
+                >
+                  Test Option 1
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onSelect={() => {
+                    console.log('Test option 2 selected');
+                    alert('Test option 2 selected');
+                  }}
+                >
+                  Test Option 2
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
           <input
             ref={fileInputRef}
             type="file"
@@ -491,49 +528,36 @@ export function StockVideoUploader() {
 
         {/* B-Roll Menu */}
         {menuPosition && clickedSegmentIndex !== null && (
-          <DropdownMenu defaultOpen={true}>
-            <DropdownMenuContent
-              style={{
-                position: 'fixed',
-                left: `${menuPosition.x}px`,
-                top: `${menuPosition.y}px`,
-                transform: 'translateX(-50%)',
-                zIndex: 50
-              }}
-            >
-              <DropdownMenuItem 
-                onClick={() => {
-                  console.log('Opening search dialog');
-                  setIsSearchOpen(true);
-                  setMenuPosition(null);
-                  if (clickedSegmentIndex !== null) {
-                    setSearchTerm(transcript[clickedSegmentIndex].text);
-                  }
-                }}
-                className="gap-2"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="11" cy="11" r="8"/>
-                  <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                </svg>
-                <span>Search another one</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem className="gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 12h18M3 12l4-4m-4 4 4 4"/>
-                </svg>
-                <span>Switch to other B-roll</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem className="text-red-500 gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 6h18"/>
-                  <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
-                  <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
-                </svg>
-                <span>Remove B-roll</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div id="transcript-dropdown" onMouseDown={(e) => e.stopPropagation()} style={{
+            position: 'fixed',
+            left: `${menuPosition.x}px`,
+            top: `${menuPosition.y}px`,
+            transform: 'translateX(-50%)',
+          }}>
+            <DropdownMenu onOpenChange={(open) => setIsTranscriptDropdownOpen(open)}>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">Test Dropdown Menu</Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent id="transcript-dropdown-content" onMouseDown={(e) => e.stopPropagation()}>
+                <DropdownMenuItem 
+                  onSelect={() => {
+                    console.log('Test option 1 selected');
+                    alert('Test option 1 selected');
+                  }}
+                >
+                  Test Option 1
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onSelect={() => {
+                    console.log('Test option 2 selected');
+                    alert('Test option 2 selected');
+                  }}
+                >
+                  Test Option 2
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         )}
 
         {/* Search Assets Dialog */}
