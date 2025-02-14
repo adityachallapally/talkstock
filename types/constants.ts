@@ -38,6 +38,7 @@ export interface OverlayConfig {
   videoSrc: string;
   items?: OverlayItem[];
   type: TemplateType;
+  provider?: string;
 }
 
 export interface OverlayItem {

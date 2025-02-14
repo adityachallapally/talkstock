@@ -28,7 +28,8 @@ import { overlayStyles } from './styles';
 import { TitleFrame } from './TitleFrame';
 
 export type SubtitleProp = {
-	startInSeconds: number;
+	startMs: number;
+	endMs: number;
 	text: string;
 };
 
@@ -173,36 +174,41 @@ export const TitleAnimation: React.FC<{title: string}> = ({title}) => {
 export const CaptionedVideo: React.FC<{
 	src: string;
 	overlays?: OverlayConfig[];
-}> = ({src, overlays = []}) => {
+	transcriptionUrl?: string;
+}> = ({src, overlays = [], transcriptionUrl}) => {
 	const [subtitles, setSubtitles] = useState<SubtitleProp[]>([]);
 	const [handle] = useState(() => delayRender());
 	const {fps} = useVideoConfig();
 
-	const subtitlesFile = 'https://hx7mp5wayo6ybdwl.public.blob.vercel-storage.com/stanford_video-lGCdCm0OcnuLhBPHM9f50eS4zyqiV0.json';
-
 	const fetchSubtitles = useCallback(async () => {
 		try {
 			await Promise.all([loadFont(), loadMontserrat()]);
-			const res = await fetch(subtitlesFile);
+			if (!transcriptionUrl) {
+				setSubtitles([]);
+				continueRender(handle);
+				return;
+			}
+			const res = await fetch(transcriptionUrl);
 			const data = await res.json();
 			setSubtitles(data.transcription);
 			continueRender(handle);
 		} catch (e) {
 			cancelRender(e);
 		}
-	}, [handle, subtitlesFile]);
+	}, [handle, transcriptionUrl]);
 
 	useEffect(() => {
 		fetchSubtitles();
 
-		const c = watchStaticFile(subtitlesFile, () => {
-			fetchSubtitles();
-		});
-
-		return () => {
-			c.cancel();
-		};
-	}, [fetchSubtitles, src, subtitlesFile]);
+		if (transcriptionUrl) {
+			const c = watchStaticFile(transcriptionUrl, () => {
+				fetchSubtitles();
+			});
+			return () => {
+				c.cancel();
+			};
+		}
+	}, [fetchSubtitles, src, transcriptionUrl]);
 
 	return (
 		<AbsoluteFill style={{backgroundColor: 'white'}}>
@@ -231,11 +237,8 @@ export const CaptionedVideo: React.FC<{
 
 			{subtitles.map((subtitle, index) => {
 				const nextSubtitle = subtitles[index + 1] ?? null;
-				const subtitleStartFrame = subtitle.startInSeconds * fps;
-				const subtitleEndFrame = Math.min(
-					nextSubtitle ? nextSubtitle.startInSeconds * fps : Infinity,
-					subtitleStartFrame + fps,
-				);
+				const subtitleStartFrame = Math.round((subtitle.startMs / 1000) * fps);
+				const subtitleEndFrame = Math.round((subtitle.endMs / 1000) * fps);
 				const durationInFrames = subtitleEndFrame - subtitleStartFrame;
 				if (durationInFrames <= 0) {
 					return null;

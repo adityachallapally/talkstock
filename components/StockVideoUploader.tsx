@@ -15,16 +15,21 @@ declare global {
   }
 }
 
+interface VideoVariant {
+  src: string;
+  overlays: OverlayConfig[];
+  durationInFrames: number;
+  transcriptionUrl: string;
+  provider: string;
+}
+
 export function StockVideoUploader() {
   const [isUploading, setIsUploading] = useState(false);
-  const [videoData, setVideoData] = useState<{
-    src: string;
-    overlays?: OverlayConfig[];
-  } | null>(null);
+  const [videoVariants, setVideoVariants] = useState<VideoVariant[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const extractAudioFromVideo = async (videoFile: File): Promise<Blob> => {
+  const extractAudioFromVideo = async (videoFile: File): Promise<{ audioBlob: Blob, durationInFrames: number }> => {
     return new Promise((resolve, reject) => {
       const video = document.createElement('video');
       const audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -32,6 +37,7 @@ export function StockVideoUploader() {
 
       video.onloadedmetadata = async () => {
         const duration = video.duration;
+        const durationInFrames = Math.ceil(duration * 30); // 30 fps
         const offlineContext = new OfflineAudioContext(2, duration * audioContext.sampleRate, audioContext.sampleRate);
         
         video.play();
@@ -45,10 +51,10 @@ export function StockVideoUploader() {
           
           mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
           mediaRecorder.onstop = () => {
-            const blob = new Blob(chunks, { type: 'audio/wav' });
+            const audioBlob = new Blob(chunks, { type: 'audio/wav' });
             video.pause();
             URL.revokeObjectURL(video.src);
-            resolve(blob);
+            resolve({ audioBlob, durationInFrames });
           };
           
           mediaRecorder.start();
@@ -73,15 +79,16 @@ export function StockVideoUploader() {
 
     const file = event.target.files[0];
     setIsUploading(true);
-    setVideoData(null);
+    setVideoVariants([]);
 
     try {
-      // Extract audio from video
-      const audioBlob = await extractAudioFromVideo(file);
+      // Extract audio from video and get duration
+      const { audioBlob, durationInFrames } = await extractAudioFromVideo(file);
       
       const formData = new FormData();
       formData.append('video', file);
       formData.append('audio', audioBlob, 'audio.wav');
+      formData.append('durationInFrames', durationInFrames.toString());
 
       const response = await fetch('/api/stock-videos', {
         method: 'POST',
@@ -95,10 +102,16 @@ export function StockVideoUploader() {
       const data = await response.json();
       
       if (data.success) {
-        setVideoData({
+        // Create a variant for each provider's overlays
+        const variants = data.overlaysByProvider.map((overlays: OverlayConfig[], index: number) => ({
           src: data.src,
-          overlays: data.overlays
-        });
+          overlays,
+          durationInFrames,
+          transcriptionUrl: data.transcriptionUrl,
+          provider: overlays[0]?.provider || `Provider ${index + 1}`
+        }));
+
+        setVideoVariants(variants);
         
         toast({
           title: "Success",
@@ -137,20 +150,31 @@ export function StockVideoUploader() {
             disabled={isUploading}
             className="hidden"
           />
-          {videoData && (
-            <Player
-              component={CaptionedVideo}
-              inputProps={videoData}
-              durationInFrames={900} // Default duration, will be adjusted by the video
-              fps={30}
-              compositionHeight={1920}
-              compositionWidth={1080}
-              style={{
-                width: '100%',
-                aspectRatio: '9/16',
-              }}
-              controls
-            />
+          {videoVariants.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {videoVariants.map((variant, index) => (
+                <div key={index} className="space-y-2">
+                  <h3 className="text-lg font-semibold">{variant.provider}</h3>
+                  <Player
+                    component={CaptionedVideo}
+                    inputProps={{
+                      src: variant.src,
+                      overlays: variant.overlays,
+                      transcriptionUrl: variant.transcriptionUrl
+                    }}
+                    durationInFrames={variant.durationInFrames}
+                    fps={30}
+                    compositionHeight={1920}
+                    compositionWidth={1080}
+                    style={{
+                      width: '100%',
+                      aspectRatio: '9/16',
+                    }}
+                    controls
+                  />
+                </div>
+              ))}
+            </div>
           )}
           <Button 
             onClick={handleButtonClick}

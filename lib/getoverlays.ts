@@ -2,6 +2,7 @@ import { OverlayConfig, Caption, PromptResponse } from '@/types/constants';
 import { createClient, Videos } from 'pexels';
 import Anthropic from '@anthropic-ai/sdk';
 import { TemplateType } from '@/types/constants';
+import { getAllProviderVideos } from './services/videoProviders';
 
 // Initialize Anthropic client
 const anthropic = new Anthropic({ apiKey: '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', dangerouslyAllowBrowser: true });
@@ -211,6 +212,132 @@ export const mockOverlays = async (): Promise<OverlayConfig[]> => {
       items: []
     }
   ];
+};
+
+const getStockVideoOverlayStructure = async (captions: Caption[]): Promise<PromptResponse[]> => {
+  const promptTemplate = "You are an AI assistant specializing in creating video overlay data based on transcript analysis. Your task is to generate JSON-formatted overlay sections that add dynamic stock video overlays to enhance the video content.\n\nHere is the transcript you need to analyze:\n\n<transcript>\n{{captions}}\n</transcript>\n\nYour goal is to create STOCK_VIDEO overlay sections based on this transcript. Each overlay should provide relevant visual context to the content being discussed. You must adhere to the following rules and guidelines:\n\n1. Create 2-3 STOCK_VIDEO overlays per minute of video content.\n2. Each STOCK_VIDEO overlay should last 2-3 seconds.\n3. Place STOCK_VIDEO overlays sequentially (2-3 in a row) for a dynamic visual effect.\n4. Ensure all STOCK_VIDEO overlays are directly relevant to the transcript content at that moment.\n5. No overlays should appear before 5000ms (5 seconds) into the video.\n6. Each overlay must specify a \"type\": \"STOCK_VIDEO\".\n7. The title field should be empty for STOCK_VIDEO overlays.\n8. Use the exact timing from the transcript for when content appears.\n9. Ensure that the person speaking is visible for at least 1/3 of the total video duration.\n10. The videoKeyword can be 1-2 words and should be business or professional oriented and match the message of the video at that time.\n\nBefore generating the final JSON output, analyze the transcript and plan your overlay sections. Wrap your analysis in <overlay_planning> tags. Wrap the final result in <result> tags. In your analysis:\n\n1. Estimate the video duration based on the transcript timings.\n2. Break down the transcript into 1-minute segments.\n3. Identify key visual concepts that could be represented by stock footage.\n4. For each segment:\n   - List potential stock video concepts\n   - Describe the visual concept\n   - Explain relevance to the content\n5. Create a timeline ensuring:\n   - Even distribution throughout the video\n   - Sequential placement of overlays\n   - No overlays before 5 seconds\n6. Double-check that your plan adheres to all rules.\n\nAfter your analysis, provide the overlay sections in the following JSON format:\n\n{\n  \"sections\": [\n    {\n      \"startMs\": number,\n      \"endMs\": number,\n      \"title\": \"\",\n      \"type\": \"STOCK_VIDEO\",\n      \"videoKeyword\": \"1-2 words\"\n    }\n  ]\n}\n\nRemember:\n- startMs should be the exact millisecond when the overlay should appear\n- endMs should be between 2000ms and 3000ms after startMs\n- videoKeyword should be professional and business-oriented\n\nNow, please analyze the transcript and generate the overlay sections. Begin with your overlay planning in <overlay_planning> tags, followed by the JSON output."
+
+  const promptText = promptTemplate.replace('{{captions}}', JSON.stringify(captions, null, 2));
+  const msg = await anthropic.messages.create({
+    model: "claude-3-5-sonnet-20241022",
+    max_tokens: 4000,
+    temperature: 0,
+    messages: [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": promptText
+          }
+        ]
+      }
+    ]
+  });
+
+  // Extract JSON between <result> tags
+  const responseText = typeof msg.content[0] === 'object' && 'text' in msg.content[0] ? msg.content[0].text : '';
+  const jsonMatch = responseText?.match(/<result>([\s\S]*?)<\/result>/);
+  if (!jsonMatch) {
+    console.error('No result found in response');
+    return [];
+  }
+  const cleanResponse = jsonMatch[1].trim();
+  console.log('Stock Video Overlay Structure Response:', cleanResponse);
+  try {
+    const parsed = JSON.parse(cleanResponse);
+    return parsed.sections || [];
+  } catch (error) {
+    console.error('Failed to parse response:', error);
+    return [];
+  }
+};
+
+export const generateStockVideoOverlays = async (transcriptPath: string): Promise<OverlayConfig[][]> => {
+  try {
+    console.log('Starting stock video overlay generation with transcript:', transcriptPath);
+    
+    // Read the transcription file
+    const response = await fetch(transcriptPath);
+    console.log('Transcription fetch response:', {
+      status: response.status,
+      ok: response.ok,
+      statusText: response.statusText
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch transcription: ${response.status} ${response.statusText}`);
+    }
+    
+    const transcriptionData = await response.json();
+    console.log('Transcription data structure:', {
+      hasTranscription: !!transcriptionData.transcription,
+      transcriptionType: typeof transcriptionData.transcription,
+      isArray: Array.isArray(transcriptionData.transcription)
+    });
+
+    const captions = transcriptionData.transcription;
+    
+    if (!Array.isArray(captions)) {
+      throw new Error(`Invalid transcription format: expected array of captions, got ${typeof captions}`);
+    }
+
+    if (captions.length === 0) {
+      throw new Error('No captions found in transcription');
+    }
+
+    console.log('Processing captions:', {
+      count: captions.length,
+      firstCaption: captions[0],
+      lastCaption: captions[captions.length - 1]
+    });
+
+    const overlayStructure = await getStockVideoOverlayStructure(captions);
+    console.log('Generated stock video overlay structure:', {
+      count: overlayStructure.length
+    });
+
+    if (!overlayStructure || overlayStructure.length === 0) {
+      throw new Error('No overlay structure generated from captions');
+    }
+
+    // Transform into final overlay config with frame conversion for each provider
+    const providerOverlays = await Promise.all(
+      overlayStructure.map(async (section) => {
+        const providerVideos = await getAllProviderVideos(section.videoKeyword);
+        
+        return providerVideos.map(provider => ({
+          startFrame: Math.round((section.startMs / 1000) * VIDEO_FPS),
+          duration: Math.round(((section.endMs - section.startMs) / 1000) * VIDEO_FPS),
+          title: section.title,
+          videoSrc: provider.videoUrl || '',
+          type: TemplateType.STOCK_VIDEO,
+          items: [],
+          provider: provider.provider
+        }));
+      })
+    );
+
+    // Flatten and group by provider
+    const groupedOverlays = providerOverlays.reduce<OverlayConfig[][]>((acc, overlayGroup) => {
+      overlayGroup.forEach((overlay, index) => {
+        if (!acc[index]) acc[index] = [];
+        acc[index].push(overlay);
+      });
+      return acc;
+    }, []);
+
+    console.log('Final stock video overlays generated:', {
+      providerCount: groupedOverlays.length,
+      overlaysPerProvider: groupedOverlays.map(group => group.length)
+    });
+
+    return groupedOverlays;
+
+  } catch (error) {
+    console.error('Error generating stock video overlays:', error);
+    throw error;
+  }
 };
 
 export default generateOverlays;

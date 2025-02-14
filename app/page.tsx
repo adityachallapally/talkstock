@@ -10,6 +10,8 @@ import { Pricing } from "@/components/landing_page/Pricing";
 import FAQ from "@/components/landing_page/FAQ";
 import { Footer } from "@/components/footer";
 import VideoCounter from "@/components/landing_page/VideoCounter";
+import { StockVideoUploader } from '@/components/StockVideoUploader';
+import { PixabayTester } from '@/components/PixabayTester';
 
 const gifs = [
   { id: "1", src: "/flowers.jpg" },
@@ -42,6 +44,10 @@ export default function Home() {
         <Features />
         <Pricing />
         <FAQ />
+        <div className="space-y-8">
+          <PixabayTester />
+          <StockVideoUploader />
+        </div>
       </main>
       <Footer />
     </>
