@@ -45,6 +45,7 @@ export function StockVideoUploader() {
   const [selectedText, setSelectedText] = useState('');
   const [selectedRange, setSelectedRange] = useState<Range | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
+  const [clickedSegmentIndex, setClickedSegmentIndex] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -127,7 +128,7 @@ export function StockVideoUploader() {
   const handleButtonClick = () => {
     fileInputRef.current?.click();
   };
-
+  
   const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files || event.target.files.length === 0) {
       return;
@@ -199,6 +200,74 @@ export function StockVideoUploader() {
     }
   };
 
+  // Function to check if a text segment has a matching stock video and get the overlay info
+  const getMatchingStockVideo = (startMs: number, endMs: number) => {
+    if (!videoVariants.length) return null;
+    const currentVariant = videoVariants[0]; // Using first variant (Pexels)
+    
+    // Convert milliseconds to frames
+    const startFrame = Math.round((startMs / 1000) * 30); // 30 fps
+    const endFrame = Math.round((endMs / 1000) * 30);
+    
+    return currentVariant.overlays.find(overlay => {
+      const overlayEndFrame = overlay.startFrame + overlay.duration;
+      return overlay.type === 'STOCK_VIDEO' &&
+             ((startFrame >= overlay.startFrame && startFrame <= overlayEndFrame) ||
+              (endFrame >= overlay.startFrame && endFrame <= overlayEndFrame));
+    });
+  };
+
+  // Group consecutive segments that belong to the same overlay
+  const getGroupedTranscript = () => {
+    const groups: { 
+      segments: TranscriptLine[],
+      overlay: OverlayConfig | null,
+      startIndex: number
+    }[] = [];
+    let currentGroup: TranscriptLine[] = [];
+    let currentOverlay: OverlayConfig | null = null;
+    let groupStartIndex = 0;
+
+    transcript.forEach((line, index) => {
+      const overlay = getMatchingStockVideo(line.startMs, line.endMs);
+      
+      if (overlay !== currentOverlay) {
+        if (currentGroup.length > 0) {
+          groups.push({ 
+            segments: [...currentGroup], 
+            overlay: currentOverlay,
+            startIndex: groupStartIndex
+          });
+        }
+        currentGroup = [line];
+        currentOverlay = overlay;
+        groupStartIndex = index;
+      } else {
+        currentGroup.push(line);
+      }
+    });
+
+    // Add the last group
+    if (currentGroup.length > 0) {
+      groups.push({ 
+        segments: currentGroup, 
+        overlay: currentOverlay,
+        startIndex: groupStartIndex
+      });
+    }
+
+    return groups;
+  };
+
+  const handleSegmentClick = (event: React.MouseEvent, startIndex: number) => {
+    setClickedSegmentIndex(startIndex);
+    const rect = (event.target as HTMLElement).getBoundingClientRect();
+    setMenuPosition({
+      x: rect.left + (rect.width / 2),
+      y: rect.bottom
+    });
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -231,13 +300,16 @@ export function StockVideoUploader() {
                 <div 
                   id="transcript-container"
                   className="w-1/2 bg-muted p-4 rounded-lg max-h-[600px] overflow-y-auto"
-                  onMouseUp={handleTextSelection}
                 >
                   <h3 className="text-lg font-semibold mb-4">Transcript</h3>
                   <p className="whitespace-normal">
-                    {transcript.map((line, index) => (
-                      <span key={index} className="inline">
-                        {line.text}{' '}
+                    {getGroupedTranscript().map(({ segments, overlay, startIndex }) => (
+                      <span 
+                        key={startIndex}
+                        onClick={overlay ? (e) => handleSegmentClick(e, startIndex) : undefined}
+                        className={`inline ${overlay ? 'bg-green-500/20 px-1 rounded cursor-pointer hover:bg-green-500/30' : ''}`}
+                      >
+                        {segments.map(segment => segment.text).join(' ')}{' '}
                       </span>
                     ))}
                   </p>
@@ -281,8 +353,41 @@ export function StockVideoUploader() {
           </Button>
         </div>
 
-        {/* Selection Menu */}
-        {menuPosition && selectedText && (
+        {/* B-Roll Menu */}
+        {menuPosition && clickedSegmentIndex !== null && (
+          <DropdownMenu 
+            open={clickedSegmentIndex !== null} 
+            onOpenChange={(open) => !open && handleClickAway()}
+          >
+            <DropdownMenuContent
+              style={{
+                position: 'fixed',
+                left: `${menuPosition.x}px`,
+                top: `${menuPosition.y}px`,
+                transform: 'translateX(-50%)',
+              }}
+            >
+              <DropdownMenuItem onSelect={() => console.log('Edit Text Overlay')}>
+                <span className="flex items-center">
+                  Edit Text Overlay
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => console.log('Switch B-roll')}>
+                <span className="flex items-center">
+                  Switch to other B-roll
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => console.log('Remove B-roll')} className="text-red-500">
+                <span className="flex items-center">
+                  Remove B-roll
+                </span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+
+        {/* Selection Menu (keep the existing one for text selection) */}
+        {menuPosition && selectedText && !clickedSegmentIndex && (
           <DropdownMenu 
             open={!!selectedText} 
             onOpenChange={(open) => !open && handleClickAway()}
