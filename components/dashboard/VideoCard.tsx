@@ -92,6 +92,42 @@ const VideoCard = ({ video }: { video: VideoData }) => {
         }
     };
 
+    const handleAddStockVideos = async () => {
+        setIsLoading(true);
+        try {
+            const response = await fetch('/api/add-stock-videos', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ videoId: video.id }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to add stock videos');
+            }
+
+            const data = await response.json();
+            
+            toast({
+                title: "Success",
+                description: "Stock videos are being added to your video. This may take a few minutes.",
+            });
+            
+            // Refresh the page to show updated status
+            router.refresh();
+        } catch (error) {
+            console.error('Error adding stock videos:', error);
+            toast({
+                title: "Error",
+                description: "Failed to add stock videos. Please try again.",
+                variant: "destructive",
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     useEffect(() => {
         if (video.videoLink) {
             setVideoLoaded(true);
@@ -156,11 +192,20 @@ const VideoCard = ({ video }: { video: VideoData }) => {
                                             Retry Render
                                         </Button>
                                     )}
-                                    {(state.status === "init" || state.status === "invoking") && (
-                                        <Button className="w-full" onClick={handleDownload}>
-                                            Render and Download Video
-                                        </Button>
-                                    )}
+                                    {state.status === "init" || state.status === "invoking" ? (
+                                        <div className="space-y-2">
+                                            <Button className="w-full" onClick={handleDownload}>
+                                                Render and Download Video
+                                            </Button>
+                                            <Button 
+                                                className="w-full" 
+                                                onClick={handleAddStockVideos}
+                                                variant="outline"
+                                            >
+                                                Add Stock Videos
+                                            </Button>
+                                        </div>
+                                    ) : null}
                                 </>
                             ) : (
                                 <div className="w-full aspect-[9/16] bg-gray-200 rounded-lg flex items-center justify-center">

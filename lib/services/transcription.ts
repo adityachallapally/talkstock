@@ -20,6 +20,9 @@ import {
     installWhisperCpp,
     transcribe,
 } from '@remotion/install-whisper-cpp';
+import { openai } from '@/lib/openai';
+import { put } from '@vercel/blob';
+import { readFile } from 'fs/promises';
 
 const extractToTempAudioFile = (fileToTranscribe, tempOutFile) => {
     execSync(
@@ -87,29 +90,90 @@ const subFile = async (filePath, fileName, folder) => {
     }
 };
 
+export async function processVideo(
+  filePath: string,
+  fileName: string,
+  outputDir: string
+): Promise<string> {
+  try {
+    console.log('Reading file:', filePath);
+    const fileBuffer = await readFile(filePath);
+    
+    console.log('Generating transcription...');
+    const transcription = await openai.audio.transcriptions.create({
+      file: new File([fileBuffer], fileName, { type: 'video/mp4' }),
+      model: "whisper-1",
+      response_format: "srt",
+      language: "en"
+    });
 
-export const processVideo = async (fullPath, entry, directory) => {
-    let shouldRemoveTempDirectory = false;
-    if (!existsSync(path.join(process.cwd(), 'temp'))) {
-        mkdirSync(`temp`);
-        shouldRemoveTempDirectory = true;
+    const transcriptionString = String(transcription);
+    console.log("Raw transcription:", transcriptionString);
+
+    const { captions } = parseSrt({ input: transcriptionString });
+
+    console.log('Uploading captions file');
+    const captionsBuffer = Buffer.from(JSON.stringify({ transcription: captions }, null, 2));
+    const captionsBlob = await put(`${outputDir}/captions_${Date.now()}.json`, captionsBuffer, {
+      access: 'public',
+      contentType: 'application/json'
+    });
+
+    console.log(`Captions file uploaded to: ${captionsBlob.url}`);
+    return captionsBlob.url;
+
+  } catch (error) {
+    console.error('Error in processVideo:', error);
+    throw error;
+  }
+}
+
+interface SrtCaption {
+  text: string;
+  startMs: number;
+  endMs: number;
+  confidence: number;
+  timestampMs: number;
+}
+
+interface SrtParseResult {
+  captions: SrtCaption[];
+}
+
+function parseSrt({ input }: { input: string }): SrtParseResult {
+  const captions: SrtCaption[] = [];
+  const blocks = input.trim().split('\n\n');
+
+  for (const block of blocks) {
+    const lines = block.split('\n');
+    if (lines.length < 3) continue;
+
+    // Parse timecode
+    const timecode = lines[1];
+    const [start, end] = timecode.split(' --> ').map(timeToMs);
+    
+    // Join remaining lines as text
+    const text = lines.slice(2).join(' ');
+
+    if (start !== null && end !== null) {
+      captions.push({
+        text,
+        startMs: start,
+        endMs: end,
+        confidence: 1, // Whisper doesn't provide confidence scores
+        timestampMs: start + ((end - start) / 2) // Calculate middle point
+      });
     }
-    console.log('Extracting audio from file', entry);
+  }
 
-    const tempWavFileName = entry.split('.')[0] + '.wav';
-    const tempOutFilePath = path.join(process.cwd(), `temp/${tempWavFileName}`);
+  return { captions };
+}
 
-    extractToTempAudioFile(fullPath, tempOutFilePath);
-    const transcriptionPath = await subFile(
-        tempOutFilePath,
-        tempWavFileName,
-        path.relative('public', directory),
-    );
-    if (shouldRemoveTempDirectory) {
-        rmSync(path.join(process.cwd(), 'temp'), {recursive: true});
-    }
-    return transcriptionPath;
-};
+function timeToMs(timeStr: string): number {
+  const [time, ms] = timeStr.split(',');
+  const [hours, minutes, seconds] = time.split(':').map(Number);
+  return (hours * 3600000) + (minutes * 60000) + (seconds * 1000) + Number(ms);
+}
 
 export const initializeWhisper = async () => {
     await installWhisperCpp({to: WHISPER_PATH, version: WHISPER_VERSION});

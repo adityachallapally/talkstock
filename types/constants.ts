@@ -6,6 +6,17 @@ export const CompositionProps = z.object({
   audioSrc: z.string(),
   subtitlesSrc: z.string(),
   durationInFrames: z.number().optional(),
+  overlays: z.array(z.object({
+    startFrame: z.number(),
+    duration: z.number(),
+    title: z.string(),
+    videoSrc: z.string().optional(),
+    type: z.enum(['BULLET_LIST', 'WORD_SWAP', 'NUMBER_HIGHLIGHT', 'STOCK_VIDEO']),
+    items: z.array(z.object({
+      text: z.string(),
+      delay: z.number()
+    }))
+  })).optional()
 });
 
 export const DURATION_IN_FRAMES = 900; // Default duration
