@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Player } from '@remotion/player';
 import { CaptionedVideo } from '@/components/remotion/CaptionedVideo';
-import { OverlayConfig } from '@/types/constants';
+import { OverlayConfig, TemplateType } from '@/types/constants';
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import {
@@ -46,6 +46,9 @@ export function StockVideoUploader() {
   const [selectedRange, setSelectedRange] = useState<Range | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const [clickedSegmentIndex, setClickedSegmentIndex] = useState<number | null>(null);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchResults, setSearchResults] = useState<{ videoSrc: string }[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -200,6 +203,127 @@ export function StockVideoUploader() {
     }
   };
 
+  const handleDemoClick = async () => {
+    setIsUploading(true);
+    setVideoVariants([]);
+    setTranscript([]);
+
+    try {
+      const demoVideoUrl = 'https://hx7mp5wayo6ybdwl.public.blob.vercel-storage.com/IMG_6062-ustELCsT8kuxTiuEmUhR0NTEefvx6P.MP4';
+      const demoTranscriptUrl = 'https://hx7mp5wayo6ybdwl.public.blob.vercel-storage.com/transcriptions/14-LPluQMfijVrCEOY2nAiqc4yTzuvPYR.json';
+
+      // Mock overlays based on the logs
+      const mockOverlays: OverlayConfig[] = [
+        {
+          startFrame: Math.round((8540 / 1000) * 30),
+          duration: Math.round((2000 / 1000) * 30),
+          type: TemplateType.STOCK_VIDEO,
+          videoSrc: 'https://videos.pexels.com/video-files/5717293/5717293-uhd_2160_3840_25fps.mp4',
+          title: '',
+          provider: 'Pexels'
+        },
+        {
+          startFrame: Math.round((11800 / 1000) * 30),
+          duration: Math.round((2000 / 1000) * 30),
+          type: TemplateType.STOCK_VIDEO,
+          videoSrc: 'https://videos.pexels.com/video-files/9364184/9364184-sd_240_426_25fps.mp4',
+          title: '',
+          provider: 'Pexels'
+        },
+        {
+          startFrame: Math.round((14560 / 1000) * 30),
+          duration: Math.round((2000 / 1000) * 30),
+          type: TemplateType.STOCK_VIDEO,
+          videoSrc: 'https://videos.pexels.com/video-files/7822022/7822022-sd_360_640_30fps.mp4',
+          title: '',
+          provider: 'Pexels'
+        },
+        {
+          startFrame: Math.round((22360 / 1000) * 30),
+          duration: Math.round((2000 / 1000) * 30),
+          type: TemplateType.STOCK_VIDEO,
+          videoSrc: 'https://videos.pexels.com/video-files/5495890/5495890-sd_540_960_30fps.mp4',
+          title: '',
+          provider: 'Pexels'
+        },
+        {
+          startFrame: Math.round((25320 / 1000) * 30),
+          duration: Math.round((2000 / 1000) * 30),
+          type: TemplateType.STOCK_VIDEO,
+          videoSrc: 'https://videos.pexels.com/video-files/7660184/7660184-uhd_1440_2560_25fps.mp4',
+          title: '',
+          provider: 'Pexels'
+        },
+        {
+          startFrame: Math.round((34880 / 1000) * 30),
+          duration: Math.round((2000 / 1000) * 30),
+          type: TemplateType.STOCK_VIDEO,
+          videoSrc: 'https://videos.pexels.com/video-files/5756114/5756114-uhd_2160_3840_24fps.mp4',
+          title: '',
+          provider: 'Pexels'
+        },
+        {
+          startFrame: Math.round((38260 / 1000) * 30),
+          duration: Math.round((2000 / 1000) * 30),
+          type: TemplateType.STOCK_VIDEO,
+          videoSrc: 'https://videos.pexels.com/video-files/8165696/8165696-uhd_2160_4096_25fps.mp4',
+          title: '',
+          provider: 'Pexels'
+        }
+      ];
+
+      // Create a mock variant with demo content
+      const demoVariant = {
+        src: demoVideoUrl,
+        overlays: mockOverlays,
+        durationInFrames: Math.round((41420 / 1000) * 30), // Based on the last caption timestamp from logs
+        transcriptionUrl: demoTranscriptUrl,
+        provider: 'Pexels'
+      };
+
+      setVideoVariants([demoVariant]);
+
+      // Fetch and set transcript
+      const transcriptResponse = await fetch(demoTranscriptUrl);
+      const transcriptData = await transcriptResponse.json();
+      setTranscript(transcriptData.transcription);
+      
+      toast({
+        title: "Success",
+        description: "Demo content loaded successfully!",
+      });
+
+    } catch (error) {
+      console.error('Demo loading error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load demo content. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleSearch = async () => {
+    if (!searchTerm.trim()) return;
+
+    try {
+      const response = await fetch(`/api/search-videos?term=${encodeURIComponent(searchTerm)}`);
+      if (!response.ok) throw new Error('Search failed');
+      
+      const data = await response.json();
+      setSearchResults(data.videos || []);
+    } catch (error) {
+      console.error('Search error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to search videos. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Function to check if a text segment has a matching stock video and get the overlay info
   const getMatchingStockVideo = (startMs: number, endMs: number) => {
     if (!videoVariants.length) return null;
@@ -260,12 +384,15 @@ export function StockVideoUploader() {
   };
 
   const handleSegmentClick = (event: React.MouseEvent, startIndex: number) => {
+    console.log('Segment clicked:', startIndex);
+    console.log('Current transcript line:', transcript[startIndex]);
     setClickedSegmentIndex(startIndex);
     const rect = (event.target as HTMLElement).getBoundingClientRect();
     setMenuPosition({
       x: rect.left + (rect.width / 2),
       y: rect.bottom
     });
+    console.log('Menu position set to:', { x: rect.left + (rect.width / 2), y: rect.bottom });
   };
 
   return (
@@ -347,43 +474,184 @@ export function StockVideoUploader() {
           <Button 
             onClick={handleButtonClick}
             disabled={isUploading}
-            className="w-full"
+            className="w-full mb-2"
           >
             {isUploading ? 'Processing...' : 'Select Video'}
+          </Button>
+
+          <Button 
+            onClick={handleDemoClick}
+            disabled={isUploading}
+            variant="secondary"
+            className="w-full"
+          >
+            Load Demo Content
           </Button>
         </div>
 
         {/* B-Roll Menu */}
         {menuPosition && clickedSegmentIndex !== null && (
-          <DropdownMenu 
-            open={clickedSegmentIndex !== null} 
-            onOpenChange={(open) => !open && handleClickAway()}
-          >
+          <DropdownMenu defaultOpen={true}>
             <DropdownMenuContent
               style={{
                 position: 'fixed',
                 left: `${menuPosition.x}px`,
                 top: `${menuPosition.y}px`,
                 transform: 'translateX(-50%)',
+                zIndex: 50
               }}
             >
-              <DropdownMenuItem onSelect={() => console.log('Edit Text Overlay')}>
-                <span className="flex items-center">
-                  Edit Text Overlay
-                </span>
+              <DropdownMenuItem 
+                onClick={() => {
+                  console.log('Opening search dialog');
+                  setIsSearchOpen(true);
+                  setMenuPosition(null);
+                  if (clickedSegmentIndex !== null) {
+                    setSearchTerm(transcript[clickedSegmentIndex].text);
+                  }
+                }}
+                className="gap-2"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8"/>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                <span>Search another one</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => console.log('Switch B-roll')}>
-                <span className="flex items-center">
-                  Switch to other B-roll
-                </span>
+              <DropdownMenuItem className="gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 12h18M3 12l4-4m-4 4 4 4"/>
+                </svg>
+                <span>Switch to other B-roll</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => console.log('Remove B-roll')} className="text-red-500">
-                <span className="flex items-center">
-                  Remove B-roll
-                </span>
+              <DropdownMenuItem className="text-red-500 gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 6h18"/>
+                  <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                  <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                </svg>
+                <span>Remove B-roll</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+        )}
+
+        {/* Search Assets Dialog */}
+        {isSearchOpen && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-[90vw] max-w-4xl max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-semibold">Search Assets</h2>
+                <button 
+                  onClick={() => setIsSearchOpen(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              </div>
+              
+              <div className="flex gap-4 mb-6">
+                <div className="flex-1 relative">
+                  <input
+                    type="text"
+                    placeholder="Search..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full px-4 py-2 border rounded-lg pr-10"
+                  />
+                  <svg 
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                    xmlns="http://www.w3.org/2000/svg" 
+                    width="20" 
+                    height="20" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    strokeWidth="2" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round"
+                  >
+                    <circle cx="11" cy="11" r="8"/>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                  </svg>
+                </div>
+                <Button onClick={handleSearch}>
+                  Search
+                </Button>
+              </div>
+
+              <div className="flex gap-4 mb-6">
+                <button className="text-blue-600 font-medium px-4 py-2 rounded-lg hover:bg-blue-50 border-b-2 border-blue-600">
+                  Stock Assets
+                </button>
+                <button className="text-gray-600 font-medium px-4 py-2 rounded-lg hover:bg-gray-50 flex items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
+                    <polyline points="13 2 13 9 20 9"/>
+                  </svg>
+                  Web Images
+                </button>
+                <button className="text-gray-600 font-medium px-4 py-2 rounded-lg hover:bg-gray-50">
+                  Uploaded
+                </button>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                {searchResults.map((result, index) => (
+                  <div 
+                    key={index} 
+                    className="aspect-[9/16] relative rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500"
+                    onClick={() => {
+                      // Update the overlay with the new video
+                      if (videoVariants.length && clickedSegmentIndex !== null) {
+                        const newOverlays = [...videoVariants[0].overlays];
+                        const overlayIndex = newOverlays.findIndex(overlay => {
+                          const startFrame = Math.round((transcript[clickedSegmentIndex].startMs / 1000) * 30);
+                          const endFrame = Math.round((transcript[clickedSegmentIndex].endMs / 1000) * 30);
+                          return overlay.startFrame <= endFrame && overlay.startFrame + overlay.duration >= startFrame;
+                        });
+
+                        if (overlayIndex !== -1) {
+                          newOverlays[overlayIndex] = {
+                            ...newOverlays[overlayIndex],
+                            videoSrc: result.videoSrc
+                          };
+                          
+                          setVideoVariants([{
+                            ...videoVariants[0],
+                            overlays: newOverlays
+                          }]);
+                          
+                          setIsSearchOpen(false);
+                          handleClickAway();
+                          
+                          toast({
+                            title: "Success",
+                            description: "B-roll updated successfully!",
+                          });
+                        }
+                      }
+                    }}
+                  >
+                    <video 
+                      src={result.videoSrc}
+                      className="w-full h-full object-cover"
+                      loop
+                      muted
+                      onMouseEnter={e => e.currentTarget.play()}
+                      onMouseLeave={e => {
+                        e.currentTarget.pause();
+                        e.currentTarget.currentTime = 0;
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Selection Menu (keep the existing one for text selection) */}
