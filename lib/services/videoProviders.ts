@@ -18,11 +18,17 @@ export const getFirstPexelsVideoUrl = async (term: string): Promise<string | nul
     const video = response.videos?.[0] as PexelsVideo | undefined;
     if (video?.video_files) {
       const mp4File = video.video_files.find(file => file.file_type === 'video/mp4');
+      console.log('Pexels result for term:', term, mp4File?.link || 'No video found');
       return mp4File?.link || null;
     }
     return null;
   } catch (error) {
-    console.error('Error fetching videos from Pexels:', error);
+    console.error('Error fetching videos from Pexels:', {
+      error,
+      message: error instanceof Error ? error.message : 'Unknown error',
+      term
+    });
+    // Don't throw, just return null to allow other providers to work
     return null;
   }
 };
@@ -33,21 +39,40 @@ export interface ProviderVideo {
 }
 
 export const getAllProviderVideos = async (term: string): Promise<ProviderVideo[]> => {
+  console.log('Fetching videos for term:', term);
+  
   const providers = [
     { name: 'Pexels', getVideo: getFirstPexelsVideoUrl },
     { name: 'Pixabay', getVideo: getFirstPixabayVideoUrl },
-    // Add more providers here
   ];
 
-  const results = await Promise.all(
-    providers.map(async (provider) => {
-      const videoUrl = await provider.getVideo(term);
-      return {
-        provider: provider.name,
-        videoUrl
-      };
-    })
-  );
+  try {
+    const results = await Promise.all(
+      providers.map(async (provider) => {
+        try {
+          const videoUrl = await provider.getVideo(term);
+          console.log(`${provider.name} result:`, videoUrl ? 'Found video' : 'No video found');
+          return {
+            provider: provider.name,
+            videoUrl
+          };
+        } catch (error) {
+          console.error(`Error with ${provider.name}:`, error);
+          return {
+            provider: provider.name,
+            videoUrl: null
+          };
+        }
+      })
+    );
 
-  return results.filter(result => result.videoUrl !== null);
+    // Filter out providers that didn't return a video
+    const validResults = results.filter(result => result.videoUrl !== null);
+    console.log('Valid provider results:', validResults.length);
+    
+    return validResults;
+  } catch (error) {
+    console.error('Error fetching from all providers:', error);
+    return []; // Return empty array rather than throwing
+  }
 }; 
