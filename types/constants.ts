@@ -34,11 +34,11 @@ export enum TemplateType {
 export interface OverlayConfig {
   startFrame: number;
   duration: number;
-  title?: string;
-  videoSrc: string;
-  items?: OverlayItem[];
   type: TemplateType;
+  videoSrc?: string;
+  title?: string;
   provider?: string;
+  searchTerm?: string;
 }
 
 export interface OverlayItem {

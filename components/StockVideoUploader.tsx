@@ -44,6 +44,7 @@ export function StockVideoUploader() {
   const [transcript, setTranscript] = useState<TranscriptLine[]>([]);
   const [selectedText, setSelectedText] = useState('');
   const [selectedRange, setSelectedRange] = useState<Range | null>(null);
+  const [selectedTranscriptSegment, setSelectedTranscriptSegment] = useState<TranscriptLine | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const [clickedSegmentIndex, setClickedSegmentIndex] = useState<number | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -52,6 +53,9 @@ export function StockVideoUploader() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const [selectedVideo, setSelectedVideo] = useState<{ videoSrc: string } | null>(null);
+  const [hasExistingOverlay, setHasExistingOverlay] = useState(false);
+  const [pendingTranscriptSegment, setPendingTranscriptSegment] = useState<TranscriptLine | null>(null);
 
   const handleTextSelection = () => {
     const selection = window.getSelection();
@@ -61,20 +65,294 @@ export function StockVideoUploader() {
 
     const text = selection.toString().trim();
     if (text) {
+      console.log('Text Selection:', {
+        selectedText: text,
+        selectionLength: text.length
+      });
+
       const range = selection.getRangeAt(0);
       const rect = range.getBoundingClientRect();
+      
+      const container = range.startContainer;
+      const textContent = container.textContent || '';
+      const selectionStart = range.startOffset;
+      const selectionEnd = range.endOffset;
+
+      console.log('Selection Range:', {
+        textContent,
+        selectionStart,
+        selectionEnd,
+        containerType: container.nodeType,
+        containerText: container.textContent
+      });
+      
+      // Find all transcript segments that overlap with the selection
+      const overlappingSegments = transcript.filter(segment => {
+        const segmentStartInText = textContent.indexOf(segment.text);
+        if (segmentStartInText === -1) return false;
+        const segmentEndInText = segmentStartInText + segment.text.length;
+
+        // More precise overlap check
+        const isOverlapping = (
+          // Selection completely contains segment
+          (selectionStart <= segmentStartInText && selectionEnd >= segmentEndInText) ||
+          // Segment completely contains selection
+          (segmentStartInText <= selectionStart && segmentEndInText >= selectionEnd) ||
+          // Selection overlaps with start of segment
+          (selectionStart <= segmentStartInText && selectionEnd >= segmentStartInText) ||
+          // Selection overlaps with end of segment
+          (selectionStart <= segmentEndInText && selectionEnd >= segmentEndInText)
+        );
+        
+        console.log('Segment Check:', {
+          segmentText: segment.text,
+          segmentStart: segmentStartInText,
+          segmentEnd: segmentEndInText,
+          isOverlapping,
+          startMs: segment.startMs,
+          endMs: segment.endMs
+        });
+
+        return isOverlapping;
+      });
+
+      console.log('Overlapping Segments:', {
+        count: overlappingSegments.length,
+        segments: overlappingSegments.map(s => ({
+          text: s.text,
+          startMs: s.startMs,
+          endMs: s.endMs
+        }))
+      });
+
+      if (overlappingSegments.length > 0 && videoVariants.length) {
+        // Find the segments that best match the selection
+        const selectedTextStart = textContent.indexOf(text, selectionStart);
+        const selectedTextEnd = selectedTextStart + text.length;
+
+        // Sort segments by how well they match the selection
+        const sortedSegments = overlappingSegments.sort((a, b) => {
+          const aStart = textContent.indexOf(a.text);
+          const bStart = textContent.indexOf(b.text);
+          const aDistance = Math.abs(aStart - selectedTextStart);
+          const bDistance = Math.abs(bStart - selectedTextStart);
+          return aDistance - bDistance;
+        });
+
+        console.log('Sorted Segments:', {
+          selectedTextStart,
+          selectedTextEnd,
+          segments: sortedSegments.map(s => ({
+            text: s.text,
+            startMs: s.startMs,
+            endMs: s.endMs,
+            position: textContent.indexOf(s.text)
+          }))
+        });
+
+        // Use the segments that best match the selection
+        const firstSegment = sortedSegments[0];
+        const lastSegment = sortedSegments[sortedSegments.length - 1];
+        
+        const combinedSegment = {
+          text: text,
+          startMs: firstSegment.startMs,
+          endMs: lastSegment.endMs
+        };
+
+        console.log('Combined Segment:', combinedSegment);
+        
+        setSelectedTranscriptSegment(combinedSegment);
+
+        const startFrame = Math.round((combinedSegment.startMs / 1000) * 30);
+        const endFrame = Math.round((combinedSegment.endMs / 1000) * 30);
+        
+        // Check if there's an existing overlay
+        const existingOverlay = videoVariants[0].overlays.find(overlay => 
+          overlay.type === 'STOCK_VIDEO' && 
+          overlay.startFrame <= endFrame && 
+          (overlay.startFrame + overlay.duration) >= startFrame
+        );
+
+        console.log('Overlay Check:', {
+          startFrame,
+          endFrame,
+          hasExisting: !!existingOverlay,
+          existingOverlay,
+          allOverlays: videoVariants[0].overlays
+        });
+
+        setHasExistingOverlay(!!existingOverlay);
+      } else {
+        setHasExistingOverlay(false);
+        setSelectedTranscriptSegment(null);
+      }
+
       setSelectedText(text);
       setSelectedRange(range);
       setMenuPosition({
         x: rect.left + (rect.width / 2),
         y: rect.bottom
       });
+      setClickedSegmentIndex(null);
+    }
+  };
+
+  const findLongestWord = (text: string): string => {
+    return text.split(/\s+/).reduce((longest, current) => {
+      return current.length > longest.length ? current : longest;
+    }, '');
+  };
+
+  const handleAISelectVideo = async () => {
+    if (!selectedText) return;
+
+    const searchWord = findLongestWord(selectedText);
+
+    try {
+      const response = await fetch(`/api/search-videos?term=${encodeURIComponent(searchWord)}`);
+      if (!response.ok) throw new Error('Search failed');
+      
+      const data = await response.json();
+      if (data.videos && data.videos.length > 0) {
+        // Get the first video result
+        const selectedVideo = data.videos[0];
+        
+        if (selectedTranscriptSegment && videoVariants.length) {
+          const variant = videoVariants[0];
+          const startFrame = Math.round((selectedTranscriptSegment.startMs / 1000) * 30);
+          const rawDuration = Math.round(((selectedTranscriptSegment.endMs - selectedTranscriptSegment.startMs) / 1000) * 30);
+          const duration = rawDuration > 0 ? rawDuration : 60;
+          
+          console.log('Creating AI overlay:', {
+            startFrame,
+            rawDuration,
+            duration,
+            selectedTranscriptSegment,
+            currentOverlays: variant.overlays
+          });
+
+          // Create new overlay
+          const newOverlay: OverlayConfig = {
+            startFrame,
+            duration,
+            type: TemplateType.STOCK_VIDEO,
+            videoSrc: selectedVideo.videoSrc,
+            searchTerm: searchWord,
+            provider: 'Pexels'
+          };
+
+          // Filter out any existing overlay for this segment
+          const newOverlays = variant.overlays.filter(overlay => 
+            !(overlay.type === 'STOCK_VIDEO' && 
+              overlay.startFrame <= startFrame + newOverlay.duration && 
+              (overlay.startFrame + overlay.duration) >= startFrame)
+          );
+
+          // Add the new overlay
+          newOverlays.push(newOverlay);
+
+          console.log('Updated overlays:', {
+            previousCount: variant.overlays.length,
+            newCount: newOverlays.length,
+            newOverlay,
+            allNewOverlays: newOverlays
+          });
+
+          // Update video variants
+          setVideoVariants([{ ...variant, overlays: newOverlays }]);
+
+          toast({
+            title: "Success",
+            description: "AI selected B-Roll added successfully",
+          });
+        } else {
+          toast({
+            title: "Error",
+            description: "Could not determine the correct position in the transcript",
+            variant: "destructive",
+          });
+        }
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to AI select video. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleManualSelect = () => {
+    if (selectedTranscriptSegment) {
+      console.log('Opening manual selection with segment:', selectedTranscriptSegment);
+      setPendingTranscriptSegment(selectedTranscriptSegment);
+      setSearchTerm(selectedTranscriptSegment.text || selectedText);
+      setIsSearchOpen(true);
+      
+      // Clear visual selection only
+      window.getSelection()?.removeAllRanges();
+      setSelectedText('');
+      setMenuPosition(null);
+      setSelectedRange(null);
+    } else {
+      toast({
+        title: "Error",
+        description: "Could not determine the correct position in the transcript",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteBRoll = () => {
+    if (videoVariants.length && selectedTranscriptSegment) {
+      const variant = videoVariants[0];
+      const startFrame = Math.round((selectedTranscriptSegment.startMs / 1000) * 30);
+      const endFrame = Math.round((selectedTranscriptSegment.endMs / 1000) * 30);
+      
+      // Filter out the overlay for this segment
+      const newOverlays = variant.overlays.filter(overlay => 
+        !(overlay.type === 'STOCK_VIDEO' && 
+          overlay.startFrame <= endFrame && 
+          (overlay.startFrame + overlay.duration) >= startFrame)
+      );
+
+      setVideoVariants([{ ...variant, overlays: newOverlays }]);
+      setHasExistingOverlay(false);
+      
+      // Clear selection state
+      window.getSelection()?.removeAllRanges();
+      setSelectedText('');
+      setMenuPosition(null);
+      setSelectedRange(null);
+      setSelectedTranscriptSegment(null);
+      
+      toast({
+        title: "Success",
+        description: "B-Roll deleted successfully",
+      });
+    } else {
+      toast({
+        title: "Error",
+        description: "Could not determine the correct position in the transcript for deletion",
+        variant: "destructive",
+      });
     }
   };
 
   const handleClickAway = () => {
+    console.log('Clearing selection state', {
+      hasSelectedVideo: !!selectedVideo,
+      hasPendingTranscriptSegment: !!pendingTranscriptSegment,
+      hasSelectedTranscriptSegment: !!selectedTranscriptSegment
+    });
+    
+    // Clear everything if we're not in search
     setSelectedText('');
     setMenuPosition(null);
+    setSelectedTranscriptSegment(null);
+    setPendingTranscriptSegment(null);
+    setHasExistingOverlay(false);
     if (selectedRange) {
       window.getSelection()?.removeAllRanges();
       setSelectedRange(null);
@@ -389,18 +667,17 @@ export function StockVideoUploader() {
   };
 
   useEffect(() => {
-    const onClick = (e: MouseEvent) => {
-      const transcriptDiv = document.getElementById('transcript-container');
-      const transcriptDropdown = document.getElementById('transcript-dropdown');
-      if ((transcriptDiv && transcriptDiv.contains(e.target as Node)) ||
-          (transcriptDropdown && transcriptDropdown.contains(e.target as Node))) {
-        return;
-      }
-      handleClickAway();
-    };
-    document.addEventListener('click', onClick);
-    return () => document.removeEventListener('click', onClick);
-  }, []);
+    const transcriptDiv = document.getElementById('transcript-container');
+    if (transcriptDiv) {
+      const onMouseUp = () => {
+        handleTextSelection();
+      };
+      transcriptDiv.addEventListener('mouseup', onMouseUp);
+      return () => {
+        transcriptDiv.removeEventListener('mouseup', onMouseUp);
+      };
+    }
+  }, [transcript, videoVariants]);
 
   return (
     <Card>
@@ -525,168 +802,235 @@ export function StockVideoUploader() {
 
         {/* Search Assets Dialog */}
         {isSearchOpen && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-[90vw] max-w-4xl max-h-[90vh] overflow-y-auto">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-semibold">Search Assets</h2>
-                <button 
-                  onClick={() => setIsSearchOpen(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18"/>
-                    <line x1="6" y1="6" x2="18" y2="18"/>
-                  </svg>
-                </button>
-              </div>
-              
-              <div className="flex gap-4 mb-6">
-                <div className="flex-1 relative">
-                  <input
-                    type="text"
-                    placeholder="Search..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full px-4 py-2 border rounded-lg pr-10"
-                  />
-                  <svg 
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-                    xmlns="http://www.w3.org/2000/svg" 
-                    width="20" 
-                    height="20" 
-                    viewBox="0 0 24 24" 
-                    fill="none" 
-                    stroke="currentColor" 
-                    strokeWidth="2" 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round"
-                  >
-                    <circle cx="11" cy="11" r="8"/>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                  </svg>
-                </div>
-                <Button onClick={handleSearch}>
-                  Search
-                </Button>
-              </div>
-
-              <div className="flex gap-4 mb-6">
-                <button className="text-blue-600 font-medium px-4 py-2 rounded-lg hover:bg-blue-50 border-b-2 border-blue-600">
-                  Stock Assets
-                </button>
-                <button className="text-gray-600 font-medium px-4 py-2 rounded-lg hover:bg-gray-50 flex items-center gap-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
-                    <polyline points="13 2 13 9 20 9"/>
-                  </svg>
-                  Web Images
-                </button>
-                <button className="text-gray-600 font-medium px-4 py-2 rounded-lg hover:bg-gray-50">
-                  Uploaded
-                </button>
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                {searchResults.map((result, index) => (
-                  <div 
-                    key={index} 
-                    className="aspect-[9/16] relative rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500"
+          <div onClick={(e) => { e.stopPropagation(); }} className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div id="asset-search-dialog" className="bg-white rounded-lg w-[90vw] max-w-4xl max-h-[90vh] flex flex-col">
+              {/* Main content area */}
+              <div className="p-6 overflow-y-auto flex-1">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-semibold">Search Assets</h2>
+                  <button 
                     onClick={() => {
-                      // Update the overlay with the new video
-                      if (videoVariants.length && clickedSegmentIndex !== null) {
-                        const newOverlays = [...videoVariants[0].overlays];
-                        const overlayIndex = newOverlays.findIndex(overlay => {
-                          const startFrame = Math.round((transcript[clickedSegmentIndex].startMs / 1000) * 30);
-                          const endFrame = Math.round((transcript[clickedSegmentIndex].endMs / 1000) * 30);
-                          return overlay.startFrame <= endFrame && overlay.startFrame + overlay.duration >= startFrame;
-                        });
-
-                        if (overlayIndex !== -1) {
-                          newOverlays[overlayIndex] = {
-                            ...newOverlays[overlayIndex],
-                            videoSrc: result.videoSrc
-                          };
-                          
-                          setVideoVariants([{
-                            ...videoVariants[0],
-                            overlays: newOverlays
-                          }]);
-                          
-                          setIsSearchOpen(false);
-                          handleClickAway();
-                          
-                          toast({
-                            title: "Success",
-                            description: "B-roll updated successfully!",
-                          });
-                        }
-                      }
+                      setIsSearchOpen(false);
+                      setSelectedVideo(null);
                     }}
+                    className="text-gray-500 hover:text-gray-700"
                   >
-                    <video 
-                      src={result.videoSrc}
-                      className="w-full h-full object-cover"
-                      loop
-                      muted
-                      onMouseEnter={e => e.currentTarget.play()}
-                      onMouseLeave={e => {
-                        e.currentTarget.pause();
-                        e.currentTarget.currentTime = 0;
-                      }}
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18"/>
+                      <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                  </button>
+                </div>
+                
+                <div className="flex gap-4 mb-6">
+                  <div className="flex-1 relative">
+                    <input
+                      type="text"
+                      placeholder="Search..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full px-4 py-2 border rounded-lg pr-10"
                     />
+                    <svg 
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                      xmlns="http://www.w3.org/2000/svg" 
+                      width="20" 
+                      height="20" 
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      strokeWidth="2" 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round"
+                    >
+                      <circle cx="11" cy="11" r="8"/>
+                      <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    </svg>
                   </div>
-                ))}
+                  <Button onClick={handleSearch}>
+                    Search
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  {searchResults.map((result, index) => (
+                    <div 
+                      key={index} 
+                      className={`aspect-[9/16] relative rounded-lg overflow-hidden cursor-pointer transition-all
+                                ${selectedVideo?.videoSrc === result.videoSrc ? 'ring-4 ring-blue-500' : 'hover:ring-2 hover:ring-blue-300'}`}
+                      onClick={() => setSelectedVideo(result)}
+                    >
+                      <video 
+                        src={result.videoSrc}
+                        className="w-full h-full object-cover"
+                        loop
+                        muted
+                        onMouseEnter={e => e.currentTarget.play()}
+                        onMouseLeave={e => {
+                          e.currentTarget.pause();
+                          e.currentTarget.currentTime = 0;
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Fixed banner at bottom */}
+              <div className="border-t border-gray-200 p-4 bg-white rounded-b-lg">
+                <div className="flex justify-end">
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      console.log('Continue button clicked with:', {
+                        selectedVideo,
+                        pendingTranscriptSegment,
+                        videoVariants: videoVariants.length
+                      });
+
+                      if (!selectedVideo) {
+                        toast({
+                          title: "Error",
+                          description: "Please select a video first",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+
+                      if (!pendingTranscriptSegment) {
+                        toast({
+                          title: "Error",
+                          description: "No text segment selected. Please try selecting text again.",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+
+                      if (!videoVariants.length) {
+                        toast({
+                          title: "Error",
+                          description: "No video loaded. Please upload a video first.",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+
+                      const variant = videoVariants[0];
+                      const startFrame = Math.round((pendingTranscriptSegment.startMs / 1000) * 30);
+                      const rawDuration = Math.round(((pendingTranscriptSegment.endMs - pendingTranscriptSegment.startMs) / 1000) * 30);
+                      const duration = rawDuration > 0 ? rawDuration : 60;
+
+                      console.log('Creating new overlay:', {
+                        startFrame,
+                        rawDuration,
+                        duration,
+                        pendingTranscriptSegment
+                      });
+
+                      // Create new overlay
+                      const newOverlay: OverlayConfig = {
+                        startFrame,
+                        duration,
+                        type: TemplateType.STOCK_VIDEO,
+                        videoSrc: selectedVideo.videoSrc,
+                        searchTerm: searchTerm,
+                        provider: 'Pexels'
+                      };
+
+                      // Update overlays
+                      const updatedOverlays = variant.overlays.filter(overlay => 
+                        !(overlay.type === 'STOCK_VIDEO' && 
+                          overlay.startFrame <= startFrame + duration && 
+                          (overlay.startFrame + overlay.duration) >= startFrame)
+                      );
+                      updatedOverlays.push(newOverlay);
+
+                      console.log('Updating overlays:', {
+                        previousCount: variant.overlays.length,
+                        newCount: updatedOverlays.length,
+                        newOverlay,
+                        allNewOverlays: updatedOverlays
+                      });
+
+                      // Update video variants
+                      setVideoVariants([{ ...variant, overlays: updatedOverlays }]);
+
+                      // Close dialog and reset states
+                      setIsSearchOpen(false);
+                      setSelectedVideo(null);
+                      setPendingTranscriptSegment(null);
+                      setHasExistingOverlay(false);
+
+                      toast({
+                        title: "Success",
+                        description: "B-Roll updated successfully",
+                      });
+                    }}
+                    disabled={!selectedVideo}
+                    className={!selectedVideo ? 'opacity-50 cursor-not-allowed' : ''}
+                  >
+                    Continue
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Selection Menu (keep the existing one for text selection) */}
+        {/* Selection Menu for highlighted text */}
         {menuPosition && selectedText && !clickedSegmentIndex && (
-          <DropdownMenu 
-            open={!!selectedText} 
-            onOpenChange={(open) => !open && handleClickAway()}
+          <div 
+            id="highlight-dropdown"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'fixed',
+              left: `${menuPosition.x}px`,
+              top: `${menuPosition.y}px`,
+              transform: 'translateX(-50%)',
+              backgroundColor: 'white',
+              border: '1px solid #ccc',
+              borderRadius: '4px',
+              boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+              zIndex: 1000
+            }}
           >
-            <DropdownMenuContent
-              style={{
-                position: 'fixed',
-                left: `${menuPosition.x}px`,
-                top: `${menuPosition.y}px`,
-                transform: 'translateX(-50%)',
+            <div 
+              onClick={handleAISelectVideo}
+              className="hover:bg-gray-100"
+              style={{ 
+                cursor: 'pointer', 
+                padding: '8px 16px',
+                borderBottom: '1px solid #eee'
               }}
             >
-              <DropdownMenuItem onSelect={() => console.log('Generate video')}>
-                <span className="flex items-center">
-                  Generate video
-                </span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => console.log('Generate image')}>
-                <span className="flex items-center">
-                  Generate image
-                </span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => console.log('Search web image')}>
-                <span className="flex items-center">
-                  Search web image
-                </span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => console.log('Add GIF')}>
-                <span className="flex items-center">
-                  Add GIF
-                </span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => console.log('Upload media')}>
-                <span className="flex items-center">
-                  Upload image/video
-                </span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => console.log('Generate text')}>
-                <span className="flex items-center">
-                  Generate text overlay
-                </span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              AI Select Video
+            </div>
+            <div 
+              onClick={(e) => { e.stopPropagation(); handleManualSelect(); }}
+              className="hover:bg-gray-100"
+              style={{ 
+                cursor: 'pointer', 
+                padding: '8px 16px',
+                borderBottom: hasExistingOverlay ? '1px solid #eee' : 'none'
+              }}
+            >
+              Select B-Roll Manually
+            </div>
+            {hasExistingOverlay && (
+              <div 
+                onClick={handleDeleteBRoll}
+                className="hover:bg-gray-100"
+                style={{ 
+                  cursor: 'pointer', 
+                  padding: '8px 16px',
+                  color: '#dc2626'
+                }}
+              >
+                Delete B-Roll
+              </div>
+            )}
+          </div>
         )}
 
         {/* Update the transcript-dropdown container div by adding an onClick stopPropagation: */}
@@ -704,16 +1048,48 @@ export function StockVideoUploader() {
                  borderRadius: '4px'
                }}>
             <div onClick={() => {
-                 console.log('Test option 1 selected');
-                 alert('Test option 1 selected');
-               }} style={{ cursor: 'pointer', padding: '8px' }}>
-                  Test Option 1
+                 console.log('Select B Roll Manually');
+                 if (clickedSegmentIndex !== null) {
+                   const transcriptLine = transcript[clickedSegmentIndex];
+                   const startFrame = Math.round((transcriptLine.startMs / 1000) * 30);
+                   const endFrame = Math.round((transcriptLine.endMs / 1000) * 30);
+                   
+                   // Try to find the existing overlay for this segment
+                   const existingOverlay = videoVariants[0]?.overlays.find(overlay => 
+                     overlay.type === 'STOCK_VIDEO' && 
+                     overlay.startFrame <= endFrame && 
+                     (overlay.startFrame + overlay.duration) >= startFrame
+                   );
+                   
+                   // Use the original search term if it exists, otherwise use the transcript text
+                   setSearchTerm(existingOverlay?.searchTerm || transcriptLine.text || '');
+                 }
+                 setIsSearchOpen(true);
+                 handleClickAway();
+               }} style={{ cursor: 'pointer', padding: '8px', borderBottom: '1px solid #eee' }}>
+                  Select B Roll Manually
             </div>
             <div onClick={() => {
-                 console.log('Test option 2 selected');
-                 alert('Test option 2 selected');
+                 console.log('Delete B Roll');
+                 if (videoVariants.length && clickedSegmentIndex !== null) {
+                   const variant = videoVariants[0];
+                   const transcriptLine = transcript[clickedSegmentIndex];
+                   const startFrame = Math.round((transcriptLine.startMs / 1000) * 30);
+                   const endFrame = Math.round((transcriptLine.endMs / 1000) * 30);
+                   const newOverlays = variant.overlays.filter(overlay => 
+                     !(overlay.type === 'STOCK_VIDEO' && 
+                       overlay.startFrame <= endFrame && 
+                       (overlay.startFrame + overlay.duration) >= startFrame)
+                   );
+                   setVideoVariants([{ ...variant, overlays: newOverlays }]);
+                   toast({
+                     title: "Success",
+                     description: "B Roll deleted successfully",
+                   });
+                 }
+                 handleClickAway();
                }} style={{ cursor: 'pointer', padding: '8px' }}>
-                  Test Option 2
+                  Delete B Roll
             </div>
           </div>
         )}
