@@ -347,12 +347,18 @@ export function StockVideoUploader() {
       hasSelectedTranscriptSegment: !!selectedTranscriptSegment
     });
     
-    // Clear everything if we're not in search
+    // Clear menu-related state
     setSelectedText('');
     setMenuPosition(null);
-    setSelectedTranscriptSegment(null);
-    setPendingTranscriptSegment(null);
-    setHasExistingOverlay(false);
+    setClickedSegmentIndex(null);
+    
+    // Only clear these states if we're not in search mode
+    if (!isSearchOpen) {
+      setSelectedTranscriptSegment(null);
+      setPendingTranscriptSegment(null);
+      setHasExistingOverlay(false);
+    }
+    
     if (selectedRange) {
       window.getSelection()?.removeAllRanges();
       setSelectedRange(null);
@@ -678,6 +684,32 @@ export function StockVideoUploader() {
       };
     }
   }, [transcript, videoVariants]);
+
+  // Add click-away handler for dropdown menus
+  useEffect(() => {
+    const handleGlobalClick = (event: MouseEvent) => {
+      // Check if we have an open menu
+      if (menuPosition) {
+        // Get references to both dropdown menus
+        const highlightDropdown = document.getElementById('highlight-dropdown');
+        const transcriptDropdown = document.getElementById('transcript-dropdown');
+        
+        // Check if click is outside both dropdowns
+        if (highlightDropdown && !highlightDropdown.contains(event.target as Node) &&
+            transcriptDropdown && !transcriptDropdown.contains(event.target as Node)) {
+          handleClickAway();
+        }
+      }
+    };
+
+    // Add global click listener
+    document.addEventListener('click', handleGlobalClick);
+
+    // Cleanup
+    return () => {
+      document.removeEventListener('click', handleGlobalClick);
+    };
+  }, [menuPosition]);
 
   return (
     <Card>
