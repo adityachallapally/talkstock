@@ -15,6 +15,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Trash2, HelpCircle, RotateCcw } from 'lucide-react';
 
 // Add type declaration for webkitAudioContext
 declare global {
@@ -37,6 +38,104 @@ interface TranscriptLine {
   endMs: number;
 }
 
+// New hook for interactive highlight logic (revised to use transcript timing)
+const useHighlights = (transcript: TranscriptLine[], videoVariants: VideoVariant[], setVideoVariants: (v: VideoVariant[]) => void) => {
+  // Build an array of word objects with timing info
+  const wordData = transcript.reduce((acc: { word: string; timeMs: number }[], line) => {
+    const lineWords = line.text.split(/\s+/).filter(w => w.length > 0);
+    const wordCount = lineWords.length;
+    const duration = line.endMs - line.startMs;
+    const durationPerWord = wordCount > 0 ? duration / wordCount : 0;
+    lineWords.forEach((word, i) => {
+      acc.push({
+        word,
+        timeMs: line.startMs + i * durationPerWord
+      });
+    });
+    return acc;
+  }, []);
+
+  // Use wordData instead of simple word list
+  const words = wordData;
+
+  const [isDragging, setIsDragging] = useState(false);
+  const [activeHighlight, setActiveHighlight] = useState<string | null>(null);
+  const [dragType, setDragType] = useState<string | null>(null);
+  const [hoveredHighlight, setHoveredHighlight] = useState<string | null>(null);
+
+  const overlaysToHighlights = () => {
+    if (!videoVariants.length) return [];
+    const highlights: { id: string; start: number; end: number; overlay: OverlayConfig }[] = [];
+    const variant = videoVariants[0];
+
+    variant.overlays.forEach(overlay => {
+      if (overlay.type === TemplateType.STOCK_VIDEO) {
+        // Compute overlay start and end times in ms
+        const overlayStart = (overlay.startFrame / 30) * 1000;
+        const overlayEnd = ((overlay.startFrame + overlay.duration) / 30) * 1000;
+
+        // Find the indices in the words array that fall within these times
+        let startIndex = words.findIndex(wordObj => wordObj.timeMs >= overlayStart);
+        if(startIndex === -1) startIndex = 0;
+        let endIndex = 0;
+        for (let i = 0; i < words.length; i++) {
+          if(words[i].timeMs <= overlayEnd) {
+            endIndex = i;
+          } else {
+            break;
+          }
+        }
+
+        highlights.push({
+          id: overlay.startFrame.toString(),
+          start: startIndex,
+          end: endIndex,
+          overlay
+        });
+      }
+    });
+
+    return highlights;
+  };
+
+  const updateHighlightDuration = (id: string, newStart: number, newEnd: number) => {
+    if (!videoVariants.length || words.length === 0) return;
+    const variant = videoVariants[0];
+    // Get the times corresponding to the new start and end indices
+    const startTime = words[newStart]?.timeMs;
+    const endTime = words[newEnd]?.timeMs;
+    if(startTime === undefined || endTime === undefined) return;
+    const newStartFrame = Math.round((startTime / 1000) * 30);
+    const newEndFrame = Math.round((endTime / 1000) * 30);
+
+    const updatedOverlays = variant.overlays.map(overlay => {
+      if (overlay.type === TemplateType.STOCK_VIDEO && overlay.startFrame.toString() === id) {
+        return {
+          ...overlay,
+          startFrame: newStartFrame,
+          duration: newEndFrame - newStartFrame
+        };
+      }
+      return overlay;
+    });
+    setVideoVariants([{ ...variant, overlays: updatedOverlays }]);
+  };
+
+  return {
+    highlights: overlaysToHighlights(),
+    isDragging,
+    setIsDragging,
+    activeHighlight,
+    setActiveHighlight,
+    dragType,
+    setDragType,
+    updateHighlightDuration,
+    words,        // now array of { word, timeMs }
+    hoveredHighlight,
+    setHoveredHighlight
+  };
+};
+
 export function StockVideoUploader() {
   const [isUploading, setIsUploading] = useState(false);
   const [videoVariants, setVideoVariants] = useState<VideoVariant[]>([]);
@@ -51,11 +150,134 @@ export function StockVideoUploader() {
   const [searchResults, setSearchResults] = useState<{ videoSrc: string }[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
-  const [selectedVideo, setSelectedVideo] = useState<{ videoSrc: string } | null>(null);
   const [hasExistingOverlay, setHasExistingOverlay] = useState(false);
   const [pendingTranscriptSegment, setPendingTranscriptSegment] = useState<TranscriptLine | null>(null);
+  const { toast } = useToast();
+  const [selectedVideo, setSelectedVideo] = useState<{ videoSrc: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // New state for help toggle in transcript highlight UI
+  const [showHelp, setShowHelp] = useState(false);
+
+  // Ref for the transcript container
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Compute transcript text
+  // const transcriptText = transcript.map(line => line.text).join(' ');
+  
+  // Use the revised highlights hook, passing transcript instead of transcriptText
+  const {
+    highlights,
+    isDragging,
+    setIsDragging,
+    activeHighlight,
+    setActiveHighlight,
+    dragType,
+    setDragType,
+    updateHighlightDuration,
+    words,        // now array of { word, timeMs }
+    hoveredHighlight,
+    setHoveredHighlight
+  } = useHighlights(transcript, videoVariants, setVideoVariants);
+
+  // Functions for interactive highlight adjustments
+  const getWordIndexAtPosition = (x: number, y: number): number | null => {
+    if (!containerRef.current) return null;
+    const elements = document.elementsFromPoint(x, y);
+    const wordElement = elements.find(el => el.getAttribute('data-word-index') !== null);
+    if (wordElement) {
+      const index = wordElement.getAttribute('data-word-index');
+      return index ? parseInt(index) : null;
+    }
+    return null;
+  };
+
+  const handleMouseDown = (e: React.MouseEvent, highlightId: string | null = null, type: string | null = null) => {
+    if (highlightId) {
+      setActiveHighlight(highlightId);
+      setDragType(type);
+      setIsDragging(true);
+    }
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!isDragging || !activeHighlight) return;
+    const wordIndex = getWordIndexAtPosition(e.clientX, e.clientY);
+    if (wordIndex === null) return;
+    const highlight = highlights.find(h => h.id === activeHighlight);
+    if (highlight) {
+      if (dragType === 'start') {
+        updateHighlightDuration(activeHighlight, wordIndex, highlight.end);
+      } else {
+        updateHighlightDuration(activeHighlight, highlight.start, wordIndex);
+      }
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    setActiveHighlight(null);
+    setDragType(null);
+  };
+
+  useEffect(() => {
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, activeHighlight, dragType]);
+
+  const renderWords = () => {
+    return words.map((wordObj, index) => {
+      const highlight = highlights.find(h => index >= h.start && index <= h.end);
+      const isHovered = highlight && hoveredHighlight === highlight.id;
+      const wrapperClasses = [
+        'relative',
+        'inline',
+        highlight ? `bg-amber-600/${isHovered ? '90' : '75'}` : '',
+        highlight && index === highlight.start ? 'pl-2 rounded-l-md' : '',
+        highlight && index === highlight.end ? 'pr-2 rounded-r-md' : '',
+        'transition-colors duration-150'
+      ].filter(Boolean).join(' ');
+      return (
+        <span
+          key={index}
+          data-word-index={index}
+          className={wrapperClasses}
+          onMouseEnter={() => {
+            if (highlight) {
+              setHoveredHighlight(highlight.id);
+            }
+          }}
+          onMouseLeave={() => {
+            setHoveredHighlight(null);
+          }}
+        >
+          {highlight && index === highlight.start && (
+            <span
+              className="absolute left-0.5 top-1/2 -translate-y-1/2 w-1 h-4 cursor-ew-resize bg-amber-500/50 hover:bg-amber-400 transition-colors rounded-full"
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                handleMouseDown(e, highlight.id, 'start');
+              }}
+            />
+          )}
+          {highlight && index === highlight.end && (
+            <span
+              className="absolute right-0.5 top-1/2 -translate-y-1/2 w-1 h-4 cursor-ew-resize bg-amber-500/50 hover:bg-amber-400 transition-colors rounded-full"
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                handleMouseDown(e, highlight.id, 'end');
+              }}
+            />
+          )}
+          {wordObj.word + " "}
+        </span>
+      );
+    });
+  };
 
   const handleTextSelection = () => {
     const selection = window.getSelection();
@@ -352,7 +574,6 @@ export function StockVideoUploader() {
     setMenuPosition(null);
     setClickedSegmentIndex(null);
     
-    // Only clear these states if we're not in search mode
     if (!isSearchOpen) {
       setSelectedTranscriptSegment(null);
       setPendingTranscriptSegment(null);
@@ -766,25 +987,40 @@ export function StockVideoUploader() {
               </div>
 
               <div className="flex gap-8">
-                {/* Transcript Section */}
-                <div 
-                  id="transcript-container"
-                  className="w-1/2 bg-muted p-4 rounded-lg max-h-[600px] overflow-y-auto"
-                >
-                  <h3 className="text-lg font-semibold mb-4">Transcript</h3>
-                  <p className="whitespace-normal">
-                    {getGroupedTranscript().map(({ segments, overlay, startIndex }) => (
-                      <span 
-                        key={startIndex}
-                        onClick={overlay ? (e) => handleSegmentClick(e, startIndex) : undefined}
-                        className={`inline ${overlay ? 'bg-green-500/20 px-1 rounded cursor-pointer hover:bg-green-500/30' : ''}`}
+                {/* Transcript Section replaced with interactive highlight UI */}
+                <div className="w-1/2">
+                  <div className="bg-gray-900 text-gray-200 p-4 rounded-lg max-h-[600px] overflow-y-auto">
+                    <div className="flex justify-between items-center mb-6">
+                      <h3 className="text-lg font-light text-gray-300">
+                        Highlight transcript to generate B-roll
+                      </h3>
+                      <button 
+                        onClick={() => setShowHelp(!showHelp)}
+                        className="text-gray-400 hover:text-gray-300 flex items-center gap-2 transition-colors"
                       >
-                        {segments.map(segment => segment.text).join(' ')}{' '}
-                      </span>
-                    ))}
-                  </p>
+                        <HelpCircle className="w-4 h-4" />
+                        <span>Help</span>
+                      </button>
+                    </div>
+                    {showHelp && (
+                      <div className="bg-gray-800 rounded-md p-4 mb-6 text-sm">
+                        <h3 className="font-medium mb-2">How to use:</h3>
+                        <ul className="space-y-2 text-gray-400">
+                          <li>• Drag the handles to adjust B-roll timing</li>
+                          <li>• Click on highlighted text to see options</li>
+                        </ul>
+                      </div>
+                    )}
+                    <div
+                      ref={containerRef}
+                      className="leading-relaxed select-none relative"
+                      style={{ whiteSpace: 'normal', lineHeight: '1.7' }}
+                    >
+                      {renderWords()}
+                    </div>
+                  </div>
                 </div>
-
+                
                 {/* Video Section */}
                 <div className="w-1/2">
                   {videoVariants.map((variant, index) => (
@@ -1108,11 +1344,11 @@ export function StockVideoUploader() {
                    const transcriptLine = transcript[clickedSegmentIndex];
                    const startFrame = Math.round((transcriptLine.startMs / 1000) * 30);
                    const endFrame = Math.round((transcriptLine.endMs / 1000) * 30);
-                   const newOverlays = variant.overlays.filter(overlay => 
-                     !(overlay.type === 'STOCK_VIDEO' && 
-                       overlay.startFrame <= endFrame && 
-                       (overlay.startFrame + overlay.duration) >= startFrame)
-                   );
+                   const newOverlays = variant.overlays.filter((overlay) => {
+                     return !(overlay.type === 'STOCK_VIDEO' &&
+                       overlay.startFrame <= endFrame &&
+                       (overlay.startFrame + overlay.duration) >= startFrame);
+                   });
                    setVideoVariants([{ ...variant, overlays: newOverlays }]);
                    toast({
                      title: "Success",
