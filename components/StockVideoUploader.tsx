@@ -74,26 +74,20 @@ const useHighlights = (transcript: TranscriptLine[], videoVariants: VideoVariant
         const overlayStartMs = (overlay.startFrame / 30) * 1000;
         const overlayEndMs = ((overlay.startFrame + overlay.duration) / 30) * 1000;
 
-        // Find the indices in the words array that fall within these times
-        const startIndex = words.findIndex(wordObj => {
-          const segmentStartMs = transcript[wordObj.segmentIndex].startMs;
-          return segmentStartMs >= overlayStartMs;
+        // Find the first word that starts at or after the overlay start time
+        const startIndex = words.findIndex(wordObj => wordObj.timeMs >= overlayStartMs);
+        
+        // Find the last word that ends before or at the overlay end time
+        const endIndex = words.findLastIndex(wordObj => {
+          const wordEndMs = transcript[wordObj.segmentIndex].endMs;
+          return wordEndMs <= overlayEndMs;
         });
         
-        const endIndex = words.findIndex(wordObj => {
-          const segmentEndMs = transcript[wordObj.segmentIndex].endMs;
-          return segmentEndMs > overlayEndMs;
-        });
-        
-        if (startIndex !== -1) {
-          const lastWordIndex = endIndex === -1 ? 
-            words.length - 1 : 
-            endIndex - 1;
-          
+        if (startIndex !== -1 && endIndex !== -1 && startIndex <= endIndex) {
           highlights.push({
             id: overlay.startFrame.toString(),
             start: startIndex,
-            end: lastWordIndex,
+            end: endIndex,
             overlay
           });
         }
@@ -112,12 +106,13 @@ const useHighlights = (transcript: TranscriptLine[], videoVariants: VideoVariant
     const endTime = words[newEnd]?.timeMs;
     
     if (startTime === undefined || endTime === undefined) return;
-    
-    const newStartFrame = Math.round((startTime / 1000) * 30);
-    const newDuration = Math.round(((endTime - startTime) / 1000) * 30);
 
     const updatedOverlays = variant.overlays.map(overlay => {
       if (overlay.type === TemplateType.STOCK_VIDEO && overlay.startFrame.toString() === id) {
+        const newStartFrame = Math.round((startTime / 1000) * 30);
+        const newEndFrame = Math.round((endTime / 1000) * 30);
+        const newDuration = newEndFrame - newStartFrame;
+        
         return {
           ...overlay,
           startFrame: newStartFrame,
@@ -192,22 +187,15 @@ export function StockVideoUploader() {
   const [selectedText, setSelectedText] = useState('');
   const [selectedRange, setSelectedRange] = useState<Range | null>(null);
   const [selectedTranscriptSegment, setSelectedTranscriptSegment] = useState<TranscriptLine | null>(null);
-  const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
-  const [clickedSegmentIndex, setClickedSegmentIndex] = useState<number | null>(null);
+  const [pendingTranscriptSegment, setPendingTranscriptSegment] = useState<TranscriptLine | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchResults, setSearchResults] = useState<{ videoSrc: string }[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [hasExistingOverlay, setHasExistingOverlay] = useState(false);
-  const [pendingTranscriptSegment, setPendingTranscriptSegment] = useState<TranscriptLine | null>(null);
   const { toast } = useToast();
   const [selectedVideo, setSelectedVideo] = useState<{ videoSrc: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // New state for help toggle in transcript highlight UI
   const [showHelp, setShowHelp] = useState(false);
-
-  // Ref for the transcript container
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Compute transcript text
@@ -279,9 +267,15 @@ export function StockVideoUploader() {
       const highlight = highlights.find(h => h.id === activeHighlight);
       if (highlight) {
         if (dragType === 'start') {
-          updateHighlightDuration(activeHighlight, wordIndex, highlight.end);
+          // When dragging start handle, ensure we don't go past the end
+          if (wordIndex <= highlight.end) {
+            updateHighlightDuration(activeHighlight, wordIndex, highlight.end);
+          }
         } else {
-          updateHighlightDuration(activeHighlight, highlight.start, wordIndex);
+          // When dragging end handle, ensure we don't go before the start
+          if (wordIndex >= highlight.start) {
+            updateHighlightDuration(activeHighlight, highlight.start, wordIndex);
+          }
         }
       }
     } else {
@@ -350,22 +344,14 @@ export function StockVideoUploader() {
     
     setSelectedTranscriptSegment(segment);
     setPendingTranscriptSegment(segment);
-    setMenuPosition(menuPos);
-    setClickedSegmentIndex(highlight.start);
     setHasExistingOverlay(true);
   };
 
   // Update the renderWords function
   const renderWords = () => {
     return words.map((wordObj, index) => {
-      // Find highlight based on word's time range falling within video section's time range
       const highlight = highlights.find(h => {
-        const videoStartMs = (h.overlay.startFrame / 30) * 1000;
-        const videoEndMs = ((h.overlay.startFrame + h.overlay.duration) / 30) * 1000;
-        const wordStartMs = wordObj.timeMs;
-        const wordEndMs = transcript[wordObj.segmentIndex].endMs;
-        
-        return wordStartMs >= videoStartMs && wordEndMs <= videoEndMs;
+        return index >= h.start && index <= h.end;
       });
       
       const isHovered = highlight && hoveredHighlight === highlight.id;
@@ -373,15 +359,19 @@ export function StockVideoUploader() {
         index >= Math.min(selectionStart, selectionEnd || selectionStart) && 
         index <= Math.max(selectionStart, selectionEnd || selectionStart);
       
+      const isHighlightStart = highlight && index === highlight.start;
+      const isHighlightEnd = highlight && index === highlight.end;
+      
       const wrapperClasses = [
         'relative',
         'inline',
-        highlight ? `bg-amber-600/${isHovered ? '90' : '75'}` : '',
+        highlight ? 'bg-amber-600/75' : '',
+        isHovered ? 'bg-amber-600/90' : '',
         isSelected ? 'bg-amber-600/50' : '',
-        highlight && wordObj.timeMs === (highlight.overlay.startFrame / 30) * 1000 ? 'pl-2 rounded-l-md' : '',
-        highlight && transcript[wordObj.segmentIndex].endMs === ((highlight.overlay.startFrame + highlight.overlay.duration) / 30) * 1000 ? 'pr-2 rounded-r-md' : '',
+        isHighlightStart ? 'pl-2 rounded-l-md' : '',
+        isHighlightEnd ? 'pr-2 rounded-r-md' : '',
         'transition-colors duration-150',
-        highlight ? 'cursor-pointer' : ''
+        'cursor-pointer'
       ].filter(Boolean).join(' ');
       
       return (
@@ -389,14 +379,7 @@ export function StockVideoUploader() {
           key={index}
           data-word-index={index}
           className={wrapperClasses}
-          onMouseDown={(e) => {
-            if (highlight) {
-              e.stopPropagation();
-              handleHighlightClick(e, highlight);
-            } else {
-              handleMouseDown(e);
-            }
-          }}
+          onClick={(e) => handleSegmentClick(e, index)}
           onMouseEnter={() => {
             if (highlight) {
               setHoveredHighlight(highlight.id);
@@ -406,7 +389,7 @@ export function StockVideoUploader() {
             setHoveredHighlight(null);
           }}
         >
-          {highlight && wordObj.timeMs === (highlight.overlay.startFrame / 30) * 1000 && (
+          {isHighlightStart && (
             <span
               className="absolute left-0.5 top-1/2 -translate-y-1/2 w-1 h-4 cursor-ew-resize bg-amber-500/50 hover:bg-amber-400 transition-colors rounded-full"
               onMouseDown={(e) => {
@@ -415,7 +398,7 @@ export function StockVideoUploader() {
               }}
             />
           )}
-          {highlight && (wordObj.timeMs + (transcript[wordObj.segmentIndex].endMs - transcript[wordObj.segmentIndex].startMs)) === ((highlight.overlay.startFrame + highlight.overlay.duration) / 30) * 1000 && (
+          {isHighlightEnd && (
             <span
               className="absolute right-0.5 top-1/2 -translate-y-1/2 w-1 h-4 cursor-ew-resize bg-amber-500/50 hover:bg-amber-400 transition-colors rounded-full"
               onMouseDown={(e) => {
@@ -444,66 +427,31 @@ export function StockVideoUploader() {
       });
 
       const range = selection.getRangeAt(0);
-      const rect = range.getBoundingClientRect();
-      
       const container = range.startContainer;
       const textContent = container.textContent || '';
       const selectionStart = range.startOffset;
       const selectionEnd = range.endOffset;
 
-      console.log('Selection Range:', {
-        textContent,
-        selectionStart,
-        selectionEnd,
-        containerType: container.nodeType,
-        containerText: container.textContent
-      });
-      
       // Find all transcript segments that overlap with the selection
       const overlappingSegments = transcript.filter(segment => {
         const segmentStartInText = textContent.indexOf(segment.text);
         if (segmentStartInText === -1) return false;
         const segmentEndInText = segmentStartInText + segment.text.length;
 
-        // More precise overlap check
         const isOverlapping = (
-          // Selection completely contains segment
           (selectionStart <= segmentStartInText && selectionEnd >= segmentEndInText) ||
-          // Segment completely contains selection
           (segmentStartInText <= selectionStart && segmentEndInText >= selectionEnd) ||
-          // Selection overlaps with start of segment
           (selectionStart <= segmentStartInText && selectionEnd >= segmentStartInText) ||
-          // Selection overlaps with end of segment
           (selectionStart <= segmentEndInText && selectionEnd >= segmentEndInText)
         );
-        
-        console.log('Segment Check:', {
-          segmentText: segment.text,
-          segmentStart: segmentStartInText,
-          segmentEnd: segmentEndInText,
-          isOverlapping,
-          startMs: segment.startMs,
-          endMs: segment.endMs
-        });
 
         return isOverlapping;
       });
 
-      console.log('Overlapping Segments:', {
-        count: overlappingSegments.length,
-        segments: overlappingSegments.map(s => ({
-          text: s.text,
-          startMs: s.startMs,
-          endMs: s.endMs
-        }))
-      });
-
       if (overlappingSegments.length > 0 && videoVariants.length) {
-        // Find the segments that best match the selection
         const selectedTextStart = textContent.indexOf(text, selectionStart);
         const selectedTextEnd = selectedTextStart + text.length;
 
-        // Sort segments by how well they match the selection
         const sortedSegments = overlappingSegments.sort((a, b) => {
           const aStart = textContent.indexOf(a.text);
           const bStart = textContent.indexOf(b.text);
@@ -512,18 +460,6 @@ export function StockVideoUploader() {
           return aDistance - bDistance;
         });
 
-        console.log('Sorted Segments:', {
-          selectedTextStart,
-          selectedTextEnd,
-          segments: sortedSegments.map(s => ({
-            text: s.text,
-            startMs: s.startMs,
-            endMs: s.endMs,
-            position: textContent.indexOf(s.text)
-          }))
-        });
-
-        // Use the segments that best match the selection
         const firstSegment = sortedSegments[0];
         const lastSegment = sortedSegments[sortedSegments.length - 1];
         
@@ -533,9 +469,8 @@ export function StockVideoUploader() {
           endMs: lastSegment.endMs
         };
 
-        console.log('Combined Segment:', combinedSegment);
-        
         setSelectedTranscriptSegment(combinedSegment);
+        setPendingTranscriptSegment(combinedSegment);
 
         const startFrame = Math.round((combinedSegment.startMs / 1000) * 30);
         const endFrame = Math.round((combinedSegment.endMs / 1000) * 30);
@@ -547,27 +482,15 @@ export function StockVideoUploader() {
           (overlay.startFrame + overlay.duration) >= startFrame
         );
 
-        console.log('Overlay Check:', {
-          startFrame,
-          endFrame,
-          hasExisting: !!existingOverlay,
-          existingOverlay,
-          allOverlays: videoVariants[0].overlays
-        });
-
         setHasExistingOverlay(!!existingOverlay);
       } else {
         setHasExistingOverlay(false);
         setSelectedTranscriptSegment(null);
+        setPendingTranscriptSegment(null);
       }
 
       setSelectedText(text);
       setSelectedRange(range);
-      setMenuPosition({
-        x: rect.left + (rect.width / 2),
-        y: rect.bottom
-      });
-      setClickedSegmentIndex(null);
     }
   };
 
@@ -604,8 +527,7 @@ export function StockVideoUploader() {
       
       window.getSelection()?.removeAllRanges();
       setSelectedText('');
-      setMenuPosition(null);
-      setSelectedRange(null);
+      setHasExistingOverlay(true);
     }
   };
 
@@ -630,26 +552,16 @@ export function StockVideoUploader() {
     console.log('handleClickAway - Entry point with state:', {
       isSearchOpen,
       hasSelectedTranscriptSegment: !!selectedTranscriptSegment,
-      hasPendingTranscriptSegment: !!pendingTranscriptSegment,
-      menuPosition,
-      clickedSegmentIndex
+      hasPendingTranscriptSegment: !!pendingTranscriptSegment
     });
     
     setSelectedText('');
-    setMenuPosition(null);
-    setClickedSegmentIndex(null);
-    
-    // Log state right before the isSearchOpen check
-    console.log('handleClickAway - Before isSearchOpen check:', {
-      isSearchOpen,
-      pendingTranscriptSegment
-    });
+    setHasExistingOverlay(false);
     
     if (!isSearchOpen) {
       console.log('handleClickAway - Clearing transcript segments because isSearchOpen is false');
       setSelectedTranscriptSegment(null);
       setPendingTranscriptSegment(null);
-      setHasExistingOverlay(false);
     } else {
       console.log('handleClickAway - Preserving transcript segments because isSearchOpen is true');
     }
@@ -956,54 +868,40 @@ export function StockVideoUploader() {
     return groups;
   };
 
-  const handleSegmentClick = (event: React.MouseEvent, startIndex: number) => {
-    // Get the clicked word element
-    const wordElement = event.target as HTMLElement;
-    const wordIndex = wordElement.getAttribute('data-word-index');
+  const handleSegmentClick = (event: React.MouseEvent, wordIndex: number) => {
+    const clickedWord = words[wordIndex];
     
-    console.log('🔍 Word Click Debug:', {
-        wordIndex,
-        element: wordElement.textContent,
-        startIndex
-    });
-    
-    if (wordIndex) {
-        const index = parseInt(wordIndex);
-        const clickedWord = words[index];
-        
-        // Find the full segment this word belongs to
-        const segment = transcript.find(seg => 
-            clickedWord.timeMs >= seg.startMs && 
-            clickedWord.timeMs <= seg.endMs
-        );
+    // First check if this word is part of an existing highlight
+    const existingHighlight = highlights.find(h => 
+      wordIndex >= h.start && wordIndex <= h.end
+    );
 
-        if (segment) {
-            console.log('🔍 Found Segment:', {
-                clickedWord: {
-                    text: clickedWord.word,
-                    timeMs: clickedWord.timeMs,
-                    index
-                },
-                fullSegment: {
-                    text: segment.text,
-                    startMs: segment.startMs,
-                    endMs: segment.endMs
-                }
-            });
+    if (existingHighlight) {
+      // If clicking an existing highlight, use its full range
+      const highlightWords = words.slice(existingHighlight.start, existingHighlight.end + 1);
+      const segment = {
+        text: highlightWords.map(w => w.word).join(' '),
+        startMs: transcript[highlightWords[0].segmentIndex].startMs,
+        endMs: transcript[highlightWords[highlightWords.length - 1].segmentIndex].endMs
+      };
 
-            // Set the full segment for replacement
-            setSelectedTranscriptSegment(segment);
-            setPendingTranscriptSegment(segment);
-            setClickedSegmentIndex(startIndex);
-        }
+      setSelectedTranscriptSegment(segment);
+      setPendingTranscriptSegment(segment);
+      setHasExistingOverlay(true);
+      return;
     }
+    
+    // If not clicking a highlight, find the segment as before
+    const segment = transcript.find(seg => 
+      clickedWord.timeMs >= seg.startMs && 
+      clickedWord.timeMs <= seg.endMs
+    );
 
-    const rect = (event.target as HTMLElement).getBoundingClientRect();
-    setMenuPosition({
-        x: rect.left + (rect.width / 2),
-        y: rect.bottom
-    });
-    setIsMenuOpen(true);
+    if (segment) {
+      setSelectedTranscriptSegment(segment);
+      setPendingTranscriptSegment(segment);
+      setHasExistingOverlay(false);
+    }
   };
 
   useEffect(() => {
@@ -1023,7 +921,7 @@ export function StockVideoUploader() {
   useEffect(() => {
     const handleGlobalClick = (event: MouseEvent) => {
       // Check if we have an open menu
-      if (menuPosition) {
+      if (selectedTranscriptSegment) {
         // Get references to both dropdown menus
         const highlightDropdown = document.getElementById('highlight-dropdown');
         const transcriptDropdown = document.getElementById('transcript-dropdown');
@@ -1043,19 +941,17 @@ export function StockVideoUploader() {
     return () => {
       document.removeEventListener('click', handleGlobalClick);
     };
-  }, [menuPosition]);
+  }, [selectedTranscriptSegment]);
 
   // Update the useEffect debug logging to be more verbose
   useEffect(() => {
     console.log('State Change Debug:', {
-      menuPosition,
       selectedText,
-      clickedSegmentIndex,
       hasSelectedTranscriptSegment: !!selectedTranscriptSegment,
       hasExistingOverlay,
       highlights: highlights.length
     });
-  }, [menuPosition, selectedText, clickedSegmentIndex, selectedTranscriptSegment, hasExistingOverlay, highlights]);
+  }, [selectedText, selectedTranscriptSegment, hasExistingOverlay, highlights]);
 
   // Update the Continue button click handler in the search dialog
   const handleContinueClick = (e: React.MouseEvent) => {
@@ -1194,12 +1090,94 @@ export function StockVideoUploader() {
                         <span>Help</span>
                       </button>
                     </div>
+
+                    {/* Toolbar */}
+                    <div className="flex items-center gap-2 mb-4 p-2 bg-gray-800 rounded-md">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          if (pendingTranscriptSegment) {
+                            setSearchTerm(pendingTranscriptSegment.text);
+                            setSelectedText('');
+                            setIsSearchOpen(true);
+                          }
+                        }}
+                        disabled={!pendingTranscriptSegment}
+                        className="flex items-center gap-2"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7" />
+                          <line x1="16" y1="5" x2="22" y2="5" />
+                          <line x1="19" y1="2" x2="19" y2="8" />
+                        </svg>
+                        {hasExistingOverlay ? 'Change B-Roll' : 'Add B-Roll'}
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => {
+                          if (videoVariants.length && pendingTranscriptSegment) {
+                            const variant = videoVariants[0];
+                            const deleteStartFrame = Math.round((pendingTranscriptSegment.startMs / 1000) * 30);
+                            const deleteEndFrame = Math.round((pendingTranscriptSegment.endMs / 1000) * 30);
+                            const newOverlays = variant.overlays.filter((overlay) => {
+                              return !(overlay.type === 'STOCK_VIDEO' &&
+                                overlay.startFrame <= deleteEndFrame &&
+                                (overlay.startFrame + overlay.duration) >= deleteStartFrame);
+                            });
+                            setVideoVariants([{ ...variant, overlays: newOverlays }]);
+                            toast({
+                              title: "Success",
+                              description: "B-Roll deleted successfully",
+                            });
+                            setPendingTranscriptSegment(null);
+                            setSelectedTranscriptSegment(null);
+                            setHasExistingOverlay(false);
+                          }
+                        }}
+                        disabled={!pendingTranscriptSegment || !hasExistingOverlay}
+                        className="flex items-center gap-2"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Delete B-Roll
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setPendingTranscriptSegment(null);
+                          setSelectedTranscriptSegment(null);
+                          setSelectedText('');
+                          setHasExistingOverlay(false);
+                        }}
+                        disabled={!pendingTranscriptSegment}
+                        className="flex items-center gap-2 ml-auto"
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                        Clear Selection
+                      </Button>
+                    </div>
+
                     {showHelp && (
                       <div className="bg-gray-800 rounded-md p-4 mb-6 text-sm">
                         <h3 className="font-medium mb-2">How to use:</h3>
                         <ul className="space-y-2 text-gray-400">
+                          <li>• Select text to add or modify B-roll</li>
                           <li>• Drag the handles to adjust B-roll timing</li>
-                          <li>• Click on highlighted text to see options</li>
+                          <li>• Use the toolbar to manage B-roll sections</li>
                         </ul>
                       </div>
                     )}
@@ -1348,115 +1326,6 @@ export function StockVideoUploader() {
                   </Button>
                 </div>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* Dropdown Menu for highlighted text */}
-        {menuPosition && selectedText && !clickedSegmentIndex && (
-          <div 
-            id="highlight-dropdown"
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              position: 'fixed',
-              left: `${menuPosition.x}px`,
-              top: `${menuPosition.y}px`,
-              transform: 'translateX(-50%)',
-              backgroundColor: 'white',
-              border: '1px solid #ccc',
-              borderRadius: '4px',
-              boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-              zIndex: 1000
-            }}
-          >
-            <div 
-              onClick={handleAISelectVideo}
-              className="hover:bg-gray-100"
-              style={{ cursor: 'pointer', padding: '8px 16px', borderBottom: '1px solid #eee' }}
-            >
-              AI Select Video
-            </div>
-            <div 
-              onClick={(e) => { e.stopPropagation(); handleManualSelect(); }}
-              className="hover:bg-gray-100"
-              style={{ cursor: 'pointer', padding: '8px 16px', borderBottom: hasExistingOverlay ? '1px solid #eee' : 'none' }}
-            >
-              Select B-Roll Manually
-            </div>
-            {hasExistingOverlay && (
-              <div 
-                onClick={handleDeleteBRoll}
-                className="hover:bg-gray-100"
-                style={{ cursor: 'pointer', padding: '8px 16px', color: '#dc2626' }}
-              >
-                Delete B-Roll
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Dropdown Menu for transcript segment actions */}
-        {menuPosition && clickedSegmentIndex !== null && (
-          <div id="transcript-dropdown" 
-               onMouseDown={(e) => e.stopPropagation()}
-               onClick={(e) => e.stopPropagation()}
-               style={{
-                 position: 'fixed',
-                 left: `${menuPosition.x}px`,
-                 top: `${menuPosition.y}px`,
-                 transform: 'translateX(-50%)',
-                 backgroundColor: 'white',
-                 border: '1px solid #ccc',
-                 borderRadius: '4px'
-               }}>
-            <div onClick={() => {
-                 console.log('Select B Roll Manually clicked - Starting state:', {
-                   isSearchOpen,
-                   clickedSegmentIndex,
-                   hasTranscriptSegment: !!selectedTranscriptSegment,
-                   pendingSegment: pendingTranscriptSegment
-                 });
-                 
-                 if (pendingTranscriptSegment) {
-                   console.log('Using pending segment:', pendingTranscriptSegment);
-                   
-                   // Use the full segment that was saved from the highlight click
-                   setSearchTerm(pendingTranscriptSegment.text);
-                   setSelectedText('');
-                   setMenuPosition(null);
-                   setClickedSegmentIndex(null);
-                   setIsSearchOpen(true);
-                   
-                   console.log('State updates completed:', {
-                     segment: pendingTranscriptSegment,
-                     searchTerm: pendingTranscriptSegment.text
-                   });
-                 }
-               }} style={{ cursor: 'pointer', padding: '8px', borderBottom: '1px solid #eee' }}>
-                  Select B Roll Manually
-            </div>
-            <div onClick={() => {
-                 console.log('Delete B Roll');
-                 if (videoVariants.length && pendingTranscriptSegment) {
-                   const variant = videoVariants[0];
-                   // Use the timing from pendingTranscriptSegment
-                   const deleteStartFrame = Math.round((pendingTranscriptSegment.startMs / 1000) * 30);
-                   const deleteEndFrame = Math.round((pendingTranscriptSegment.endMs / 1000) * 30);
-                   const newOverlays = variant.overlays.filter((overlay) => {
-                     return !(overlay.type === 'STOCK_VIDEO' &&
-                       overlay.startFrame <= deleteEndFrame &&
-                       (overlay.startFrame + overlay.duration) >= deleteStartFrame);
-                   });
-                   setVideoVariants([{ ...variant, overlays: newOverlays }]);
-                   toast({
-                     title: "Success",
-                     description: "B Roll deleted successfully",
-                   });
-                 }
-                 handleClickAway();
-               }} style={{ cursor: 'pointer', padding: '8px' }}>
-                  Delete B Roll
             </div>
           </div>
         )}
