@@ -71,18 +71,29 @@ const useHighlights = (transcript: TranscriptLine[], videoVariants: VideoVariant
 
     variant.overlays.forEach(overlay => {
       if (overlay.type === TemplateType.STOCK_VIDEO) {
-        const overlayStart = (overlay.startFrame / 30) * 1000;
-        const overlayEnd = ((overlay.startFrame + overlay.duration) / 30) * 1000;
+        const overlayStartMs = (overlay.startFrame / 30) * 1000;
+        const overlayEndMs = ((overlay.startFrame + overlay.duration) / 30) * 1000;
 
         // Find the indices in the words array that fall within these times
-        const startIndex = words.findIndex(wordObj => wordObj.timeMs >= overlayStart);
-        const endIndex = words.findIndex(wordObj => wordObj.timeMs > overlayEnd);
+        const startIndex = words.findIndex(wordObj => {
+          const segmentStartMs = transcript[wordObj.segmentIndex].startMs;
+          return segmentStartMs >= overlayStartMs;
+        });
+        
+        const endIndex = words.findIndex(wordObj => {
+          const segmentEndMs = transcript[wordObj.segmentIndex].endMs;
+          return segmentEndMs > overlayEndMs;
+        });
         
         if (startIndex !== -1) {
+          const lastWordIndex = endIndex === -1 ? 
+            words.length - 1 : 
+            endIndex - 1;
+          
           highlights.push({
             id: overlay.startFrame.toString(),
             start: startIndex,
-            end: endIndex === -1 ? words.length - 1 : endIndex - 1,
+            end: lastWordIndex,
             overlay
           });
         }
@@ -328,10 +339,11 @@ export function StockVideoUploader() {
     };
     
     // Create a segment that spans the entire highlight
+    const wordsInRange = words.slice(highlight.start, highlight.end + 1);
     const segment = {
-      text: words.slice(highlight.start, highlight.end + 1).map(w => w.word).join(' '),
-      startMs: words[highlight.start].timeMs,
-      endMs: words[highlight.end].timeMs
+      text: wordsInRange.map(w => w.word).join(' '),
+      startMs: transcript[wordsInRange[0].segmentIndex].startMs,
+      endMs: transcript[wordsInRange[wordsInRange.length - 1].segmentIndex].endMs
     };
     
     console.log('🔍 Created Segment:', segment);
@@ -346,7 +358,16 @@ export function StockVideoUploader() {
   // Update the renderWords function
   const renderWords = () => {
     return words.map((wordObj, index) => {
-      const highlight = highlights.find(h => index >= h.start && index <= h.end);
+      // Find highlight based on word's time range falling within video section's time range
+      const highlight = highlights.find(h => {
+        const videoStartMs = (h.overlay.startFrame / 30) * 1000;
+        const videoEndMs = ((h.overlay.startFrame + h.overlay.duration) / 30) * 1000;
+        const wordStartMs = wordObj.timeMs;
+        const wordEndMs = transcript[wordObj.segmentIndex].endMs;
+        
+        return wordStartMs >= videoStartMs && wordEndMs <= videoEndMs;
+      });
+      
       const isHovered = highlight && hoveredHighlight === highlight.id;
       const isSelected = selectionStart !== null && 
         index >= Math.min(selectionStart, selectionEnd || selectionStart) && 
@@ -357,8 +378,8 @@ export function StockVideoUploader() {
         'inline',
         highlight ? `bg-amber-600/${isHovered ? '90' : '75'}` : '',
         isSelected ? 'bg-amber-600/50' : '',
-        highlight && index === highlight.start ? 'pl-2 rounded-l-md' : '',
-        highlight && index === highlight.end ? 'pr-2 rounded-r-md' : '',
+        highlight && wordObj.timeMs === (highlight.overlay.startFrame / 30) * 1000 ? 'pl-2 rounded-l-md' : '',
+        highlight && transcript[wordObj.segmentIndex].endMs === ((highlight.overlay.startFrame + highlight.overlay.duration) / 30) * 1000 ? 'pr-2 rounded-r-md' : '',
         'transition-colors duration-150',
         highlight ? 'cursor-pointer' : ''
       ].filter(Boolean).join(' ');
@@ -385,7 +406,7 @@ export function StockVideoUploader() {
             setHoveredHighlight(null);
           }}
         >
-          {highlight && index === highlight.start && (
+          {highlight && wordObj.timeMs === (highlight.overlay.startFrame / 30) * 1000 && (
             <span
               className="absolute left-0.5 top-1/2 -translate-y-1/2 w-1 h-4 cursor-ew-resize bg-amber-500/50 hover:bg-amber-400 transition-colors rounded-full"
               onMouseDown={(e) => {
@@ -394,7 +415,7 @@ export function StockVideoUploader() {
               }}
             />
           )}
-          {highlight && index === highlight.end && (
+          {highlight && (wordObj.timeMs + (transcript[wordObj.segmentIndex].endMs - transcript[wordObj.segmentIndex].startMs)) === ((highlight.overlay.startFrame + highlight.overlay.duration) / 30) * 1000 && (
             <span
               className="absolute right-0.5 top-1/2 -translate-y-1/2 w-1 h-4 cursor-ew-resize bg-amber-500/50 hover:bg-amber-400 transition-colors rounded-full"
               onMouseDown={(e) => {
