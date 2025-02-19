@@ -74,6 +74,17 @@ const useHighlights = (transcript: TranscriptLine[], videoVariants: VideoVariant
         const overlayStartMs = (overlay.startFrame / 30) * 1000;
         const overlayEndMs = ((overlay.startFrame + overlay.duration) / 30) * 1000;
 
+        console.log('🎨 Overlay to Highlight Conversion:', {
+          overlay: {
+            startFrame: overlay.startFrame,
+            duration: overlay.duration
+          },
+          timeMs: {
+            start: overlayStartMs,
+            end: overlayEndMs
+          }
+        });
+
         // Find the first word that starts at or after the overlay start time
         const startIndex = words.findIndex(wordObj => wordObj.timeMs >= overlayStartMs);
         
@@ -83,7 +94,35 @@ const useHighlights = (transcript: TranscriptLine[], videoVariants: VideoVariant
           return wordEndMs <= overlayEndMs;
         });
         
+        console.log('📝 Word Index Calculation:', {
+          startIndex,
+          endIndex,
+          words: {
+            start: words[startIndex]?.word,
+            end: words[endIndex]?.word
+          },
+          times: {
+            startWord: words[startIndex]?.timeMs,
+            endWord: words[endIndex]?.timeMs
+          }
+        });
+        
         if (startIndex !== -1 && endIndex !== -1 && startIndex <= endIndex) {
+          console.log('🎨 Highlight Recalculation:', {
+            frames: {
+              start: overlay.startFrame,
+              duration: overlay.duration,
+              end: overlay.startFrame + overlay.duration
+            },
+            indices: {
+              start: startIndex,
+              end: endIndex
+            },
+            words: {
+              start: words[startIndex].word,
+              end: words[endIndex].word
+            }
+          });
           highlights.push({
             id: overlay.startFrame.toString(),
             start: startIndex,
@@ -97,29 +136,38 @@ const useHighlights = (transcript: TranscriptLine[], videoVariants: VideoVariant
     return highlights;
   };
 
-  const updateHighlightDuration = (id: string, newStart: number, newEnd: number) => {
+  const updateHighlightDuration = (id: string, newStart: number, newEnd: number, type: 'start' | 'end') => {
     if (!videoVariants.length || words.length === 0) return;
     const variant = videoVariants[0];
     
-    // Get the times corresponding to the new start and end indices
-    const startTime = words[newStart]?.timeMs;
-    const endTime = words[newEnd]?.timeMs;
+    const currentOverlay = variant.overlays.find(o => 
+        o.type === TemplateType.STOCK_VIDEO && o.startFrame.toString() === id
+    );
     
-    if (startTime === undefined || endTime === undefined) return;
+    if (!currentOverlay) return;
 
     const updatedOverlays = variant.overlays.map(overlay => {
-      if (overlay.type === TemplateType.STOCK_VIDEO && overlay.startFrame.toString() === id) {
-        const newStartFrame = Math.round((startTime / 1000) * 30);
-        const newEndFrame = Math.round((endTime / 1000) * 30);
-        const newDuration = newEndFrame - newStartFrame;
-        
-        return {
-          ...overlay,
-          startFrame: newStartFrame,
-          duration: Math.max(newDuration, 30) // Ensure minimum duration of 1 second
-        };
-      }
-      return overlay;
+        if (overlay.type === TemplateType.STOCK_VIDEO && overlay.startFrame.toString() === id) {
+            if (type === 'start') {
+                // Only update start frame, keep original end frame
+                const newStartFrame = Math.round((words[newStart].timeMs / 1000) * 30);
+                const currentEndFrame = overlay.startFrame + overlay.duration;
+                return {
+                    ...overlay,
+                    startFrame: newStartFrame,
+                    duration: currentEndFrame - newStartFrame
+                };
+            } else {
+                // Only update duration based on new end position, keep original start frame
+                const newEndFrame = Math.round((words[newEnd].timeMs / 1000) * 30);
+                return {
+                    ...overlay,
+                    startFrame: overlay.startFrame,
+                    duration: newEndFrame - overlay.startFrame
+                };
+            }
+        }
+        return overlay;
     });
     
     setVideoVariants([{ ...variant, overlays: updatedOverlays }]);
@@ -234,26 +282,28 @@ export function StockVideoUploader() {
   };
 
   const handleMouseDown = (e: React.MouseEvent, highlightId: string | null = null, type: string | null = null) => {
-    // Only log word-level interactions
-    if (!isDragging && !highlightId) {
-      console.log('🎯 Word Click:', {
-        wordIndex: (e.target as HTMLElement).getAttribute('data-word-index'),
-        text: (e.target as HTMLElement).textContent?.trim()
-      });
-    }
+    console.log('🖱️ Mouse Down:', {
+        highlightId,
+        type,
+        isDragging: isDragging,
+        target: {
+            wordIndex: (e.target as HTMLElement).getAttribute('data-word-index'),
+            className: (e.target as HTMLElement).className
+        }
+    });
     
     e.preventDefault();
     if (highlightId) {
-      setActiveHighlight(highlightId);
-      setDragType(type);
-      setIsDragging(true);
-    } else {
-      const wordIndex = getWordIndexAtPosition(e.clientX, e.clientY);
-      if (wordIndex !== null) {
-        setSelectionStart(wordIndex);
-        setSelectionEnd(wordIndex);
+        setActiveHighlight(highlightId);
+        setDragType(type);
         setIsDragging(true);
-      }
+    } else {
+        const wordIndex = getWordIndexAtPosition(e.clientX, e.clientY);
+        if (wordIndex !== null) {
+            setSelectionStart(wordIndex);
+            setSelectionEnd(wordIndex);
+            setIsDragging(true);
+        }
     }
   };
 
@@ -264,22 +314,22 @@ export function StockVideoUploader() {
     if (wordIndex === null) return;
 
     if (activeHighlight) {
-      const highlight = highlights.find(h => h.id === activeHighlight);
-      if (highlight) {
-        if (dragType === 'start') {
-          // When dragging start handle, ensure we don't go past the end
-          if (wordIndex <= highlight.end) {
-            updateHighlightDuration(activeHighlight, wordIndex, highlight.end);
-          }
-        } else {
-          // When dragging end handle, ensure we don't go before the start
-          if (wordIndex >= highlight.start) {
-            updateHighlightDuration(activeHighlight, highlight.start, wordIndex);
-          }
+        const highlight = highlights.find(h => h.id === activeHighlight);
+        if (highlight) {
+            if (dragType === 'start') {
+                // When dragging start handle, ensure we don't go past the end
+                if (wordIndex <= highlight.end) {
+                    updateHighlightDuration(activeHighlight, wordIndex, highlight.end, 'start');
+                }
+            } else if (dragType === 'end') {
+                // When dragging end handle, ensure we don't go before the start
+                if (wordIndex >= highlight.start) {
+                    updateHighlightDuration(activeHighlight, highlight.start, wordIndex, 'end');
+                }
+            }
         }
-      }
     } else {
-      setSelectionEnd(wordIndex);
+        setSelectionEnd(wordIndex);
     }
   };
 
@@ -945,12 +995,6 @@ export function StockVideoUploader() {
 
   // Update the useEffect debug logging to be more verbose
   useEffect(() => {
-    console.log('State Change Debug:', {
-      selectedText,
-      hasSelectedTranscriptSegment: !!selectedTranscriptSegment,
-      hasExistingOverlay,
-      highlights: highlights.length
-    });
   }, [selectedText, selectedTranscriptSegment, hasExistingOverlay, highlights]);
 
   // Update the Continue button click handler in the search dialog
