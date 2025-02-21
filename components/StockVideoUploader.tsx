@@ -42,7 +42,7 @@ interface TranscriptLine {
 const useHighlights = (transcript: TranscriptLine[], videoVariants: VideoVariant[], setVideoVariants: (v: VideoVariant[]) => void) => {
   // Build an array of word objects with timing info
   const wordData = transcript.reduce((acc: { word: string; timeMs: number; segmentIndex: number }[], line, segmentIndex) => {
-    const lineWords = line.text.split(/(\s+|\b)/).filter(w => w.length > 0);
+    const lineWords = line.text.split(/(\s+)/).filter(w => w.length > 0);
     const wordCount = lineWords.length;
     const duration = line.endMs - line.startMs;
     const durationPerWord = wordCount > 0 ? duration / wordCount : 0;
@@ -415,13 +415,14 @@ export function StockVideoUploader() {
       const wrapperClasses = [
         'relative',
         'inline',
-        highlight ? 'bg-amber-600/75' : '',
-        isHovered ? 'bg-amber-600/90' : '',
-        isSelected ? 'bg-amber-600/50' : '',
-        isHighlightStart ? 'pl-2 rounded-l-md' : '',
-        isHighlightEnd ? 'pr-2 rounded-r-md' : '',
+        highlight ? 'bg-amber-200/75' : '',
+        isHovered ? 'bg-amber-200/90' : '',
+        isSelected ? 'bg-amber-200/50' : '',
+        isHighlightStart ? 'pl-2 rounded-l-sm' : '',
+        isHighlightEnd ? 'pr-2 rounded-r-sm' : '',
         'transition-colors duration-150',
-        'cursor-pointer'
+        'cursor-pointer',
+        'text-2xl',
       ].filter(Boolean).join(' ');
       
       return (
@@ -441,7 +442,7 @@ export function StockVideoUploader() {
         >
           {isHighlightStart && (
             <span
-              className="absolute left-0.5 top-1/2 -translate-y-1/2 w-1 h-4 cursor-ew-resize bg-amber-500/50 hover:bg-amber-400 transition-colors rounded-full"
+              className="absolute left-0.5 top-1/2 -translate-y-1/2 w-1.5 h-5 cursor-ew-resize bg-amber-400 hover:bg-amber-500 transition-colors rounded-full shadow-sm hover:shadow-md"
               onMouseDown={(e) => {
                 e.stopPropagation();
                 handleMouseDown(e, highlight.id, 'start');
@@ -450,7 +451,7 @@ export function StockVideoUploader() {
           )}
           {isHighlightEnd && (
             <span
-              className="absolute right-0.5 top-1/2 -translate-y-1/2 w-1 h-4 cursor-ew-resize bg-amber-500/50 hover:bg-amber-400 transition-colors rounded-full"
+              className="absolute right-0.5 top-1/2 -translate-y-1/2 w-1.5 h-5 cursor-ew-resize bg-amber-400 hover:bg-amber-500 transition-colors rounded-full shadow-sm hover:shadow-md"
               onMouseDown={(e) => {
                 e.stopPropagation();
                 handleMouseDown(e, highlight.id, 'end');
@@ -1065,315 +1066,296 @@ export function StockVideoUploader() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Upload Video</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {/* Test Dropdown Menu */}
-          <div className="mb-4">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline">Test Dropdown Menu</Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem 
-                  onSelect={() => {
-                    console.log('Test option 1 selected');
-                    alert('Test option 1 selected');
-                  }}
-                >
-                  Test Option 1
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onSelect={() => {
-                    console.log('Test option 2 selected');
-                    alert('Test option 2 selected');
-                  }}
-                >
-                  Test Option 2
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="video/*"
-            onChange={handleUpload}
-            disabled={isUploading}
-            className="hidden"
-          />
-          
-          {videoVariants.length > 0 && (
-            <>
-              <div className="flex items-center space-x-2 mb-4">
-                <Switch
-                  id="captions"
-                  checked={showCaptions}
-                  onCheckedChange={setShowCaptions}
-                />
-                <Label htmlFor="captions">Show Captions</Label>
-              </div>
-
-              <div className="flex gap-8">
-                {/* Transcript Section replaced with interactive highlight UI */}
-                <div className="w-1/2">
-                  <div className="bg-gray-900 text-gray-200 p-4 rounded-lg max-h-[600px] overflow-y-auto">
-                    <div className="flex justify-between items-center mb-6">
-                      <h3 className="text-lg font-light text-gray-300">
-                        Highlight transcript to generate B-roll
-                      </h3>
-                      <button 
-                        onClick={() => setShowHelp(!showHelp)}
-                        className="text-gray-400 hover:text-gray-300 flex items-center gap-2 transition-colors"
-                      >
-                        <HelpCircle className="w-4 h-4" />
-                        <span>Help</span>
-                      </button>
-                    </div>
-
-                    {/* Toolbar */}
-                    <div className="flex items-center gap-2 mb-4 p-2 bg-gray-800 rounded-md">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => {
-                          if (pendingTranscriptSegment) {
-                            setSearchTerm(pendingTranscriptSegment.text);
-                            setSelectedText('');
-                            setIsSearchOpen(true);
-                          }
-                        }}
-                        disabled={!pendingTranscriptSegment}
-                        className="flex items-center gap-2"
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7" />
-                          <line x1="16" y1="5" x2="22" y2="5" />
-                          <line x1="19" y1="2" x2="19" y2="8" />
-                        </svg>
-                        {hasExistingOverlay ? 'Change B-Roll' : 'Add B-Roll'}
-                      </Button>
-
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => {
-                          if (videoVariants.length && pendingTranscriptSegment) {
-                            const variant = videoVariants[0];
-                            const deleteStartFrame = Math.round((pendingTranscriptSegment.startMs / 1000) * 30);
-                            const deleteEndFrame = Math.round((pendingTranscriptSegment.endMs / 1000) * 30);
-                            const newOverlays = variant.overlays.filter((overlay) => {
-                              return !(overlay.type === 'STOCK_VIDEO' &&
-                                overlay.startFrame <= deleteEndFrame &&
-                                (overlay.startFrame + overlay.duration) >= deleteStartFrame);
-                            });
-                            setVideoVariants([{ ...variant, overlays: newOverlays }]);
-                            toast({
-                              title: "Success",
-                              description: "B-Roll deleted successfully",
-                            });
-                            setPendingTranscriptSegment(null);
-                            setSelectedTranscriptSegment(null);
-                            setHasExistingOverlay(false);
-                          }
-                        }}
-                        disabled={!pendingTranscriptSegment || !hasExistingOverlay}
-                        className="flex items-center gap-2"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        Delete B-Roll
-                      </Button>
-
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setPendingTranscriptSegment(null);
-                          setSelectedTranscriptSegment(null);
-                          setSelectedText('');
-                          setHasExistingOverlay(false);
-                        }}
-                        disabled={!pendingTranscriptSegment}
-                        className="flex items-center gap-2 ml-auto"
-                      >
-                        <RotateCcw className="w-4 h-4" />
-                        Clear Selection
-                      </Button>
-                    </div>
-
-                    {showHelp && (
-                      <div className="bg-gray-800 rounded-md p-4 mb-6 text-sm">
-                        <h3 className="font-medium mb-2">How to use:</h3>
-                        <ul className="space-y-2 text-gray-400">
-                          <li>• Select text to add or modify B-roll</li>
-                          <li>• Drag the handles to adjust B-roll timing</li>
-                          <li>• Use the toolbar to manage B-roll sections</li>
-                        </ul>
-                      </div>
-                    )}
-                    <div
-                      ref={containerRef}
-                      className="text-xl leading-loose select-none relative"
-                      style={{ whiteSpace: 'normal', lineHeight: '2' }}
-                    >
-                      {renderWords()}
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Video Section */}
-                <div className="w-1/2">
-                  {videoVariants.map((variant, index) => (
-                    <div key={index} className="space-y-2">
-                      <Player
-                        component={CaptionedVideo}
-                        inputProps={{
-                          src: variant.src,
-                          overlays: variant.overlays,
-                          transcriptionUrl: variant.transcriptionUrl,
-                          showCaptions
-                        }}
-                        durationInFrames={variant.durationInFrames}
-                        fps={30}
-                        compositionHeight={1920}
-                        compositionWidth={1080}
-                        style={{
-                          width: '100%',
-                          aspectRatio: '9/16',
-                        }}
-                        controls
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
-
-          <Button 
-            onClick={handleButtonClick}
-            disabled={isUploading}
-            className="w-full mb-2"
+    <div className="flex flex-col h-screen bg-white">
+      {/* Header */}
+      <div className="flex items-center justify-between px-6 py-3 border-b">
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={() => {/* Add back navigation logic */}}
+            className="text-gray-600 hover:text-gray-800 text-sm flex items-center gap-2"
           >
-            {isUploading ? 'Processing...' : 'Select Video'}
-          </Button>
-
-          <Button 
-            onClick={handleDemoClick}
-            disabled={isUploading}
-            variant="secondary"
-            className="w-full"
-          >
-            Load Demo Content
+            <span>←</span>
+            <span>Back to Library</span>
+          </button>
+          <h1 className="text-[15px] text-gray-800 font-normal">Stanford AI course research</h1>
+        </div>
+        <div className="flex items-center gap-4">
+          <span className="text-gray-600 text-sm flex items-center gap-1">
+            <span className="text-green-600">✓</span> Saved
+          </span>
+          <Button variant="ghost" className="text-orange-500 hover:text-orange-600 px-4 py-2 h-9">Upgrade</Button>
+          <Button className="bg-[#4F46E5] hover:bg-[#4338CA] text-white px-4 py-2 h-9 flex items-center gap-2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="stroke-current">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M7 10l5 5 5-5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M12 15V3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Export
           </Button>
         </div>
+      </div>
 
-        {/* Search Assets Dialog */}
-        {isSearchOpen && (
-          <div onClick={(e) => { e.stopPropagation(); }} className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div id="asset-search-dialog" className="bg-white rounded-lg w-[90vw] max-w-4xl max-h-[90vh] flex flex-col">
-              {/* Main content area */}
-              <div className="p-6 overflow-y-auto flex-1">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-semibold">Search Assets</h2>
-                  <button 
-                    onClick={() => {
-                      setIsSearchOpen(false);
-                      setSelectedVideo(null);
-                    }}
-                    className="text-gray-500 hover:text-gray-700"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="18" y1="6" x2="6" y2="18"/>
-                      <line x1="6" y1="6" x2="18" y2="18"/>
-                    </svg>
-                  </button>
-                </div>
-                
-                <div className="flex gap-4 mb-6">
-                  <div className="flex-1 relative">
-                    <input
-                      type="text"
-                      placeholder="Search..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full px-4 py-2 border rounded-lg pr-10"
-                    />
-                    <svg 
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-                      xmlns="http://www.w3.org/2000/svg" 
-                      width="20" 
-                      height="20" 
-                      viewBox="0 0 24 24" 
-                      fill="none" 
-                      stroke="currentColor" 
-                      strokeWidth="2" 
-                      strokeLinecap="round" 
-                      strokeLinejoin="round"
-                    >
-                      <circle cx="11" cy="11" r="8"/>
-                      <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                    </svg>
-                  </div>
-                  <Button onClick={handleSearch}>
-                    Search
-                  </Button>
-                </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                  {searchResults.map((result, index) => (
-                    <div 
-                      key={index} 
-                      className={`aspect-[9/16] relative rounded-lg overflow-hidden cursor-pointer transition-all
-                                ${selectedVideo?.videoSrc === result.videoSrc ? 'ring-4 ring-blue-500' : 'hover:ring-2 hover:ring-blue-300'}`}
-                      onClick={() => setSelectedVideo(result)}
-                    >
-                      <video 
-                        src={result.videoSrc}
-                        className="w-full h-full object-cover"
-                        loop
-                        muted
-                        onMouseEnter={e => e.currentTarget.play()}
-                        onMouseLeave={e => {
-                          e.currentTarget.pause();
-                          e.currentTarget.currentTime = 0;
-                        }}
-                      />
-                    </div>
-                  ))}
-                </div>
+      {/* Main Content */}
+      <div className="flex-1 flex overflow-hidden">
+        {videoVariants.length > 0 ? (
+          <>
+            {/* Transcript Section */}
+            <div className="w-[40%] h-full border-r flex flex-col">
+              <div className="flex items-center gap-2 px-4 py-2 border-b bg-gray-50">
+                <button className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-md text-sm font-medium">
+                  Visuals
+                </button>
+                <button className="px-3 py-1.5 text-gray-600 hover:bg-gray-100 rounded-md text-sm font-medium">
+                  Subtitles
+                </button>
+                <button className="px-3 py-1.5 text-gray-600 hover:bg-gray-100 rounded-md text-sm font-medium">
+                  Settings
+                </button>
               </div>
 
-              {/* Fixed banner at bottom */}
-              <div className="border-t border-gray-200 p-4 bg-white rounded-b-lg">
-                <div className="flex justify-end">
-                  <Button
-                    onClick={handleContinueClick}
-                    disabled={!selectedVideo}
-                    className={!selectedVideo ? 'opacity-50 cursor-not-allowed' : ''}
-                  >
-                    Continue
-                  </Button>
+              {/* B-Roll Action Toolbar */}
+              <div className="flex items-center gap-2 p-3 border-b">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    if (pendingTranscriptSegment) {
+                      setSearchTerm(pendingTranscriptSegment.text);
+                      setSelectedText('');
+                      setIsSearchOpen(true);
+                    }
+                  }}
+                  disabled={!pendingTranscriptSegment}
+                  className="h-8 px-3 text-sm font-medium flex items-center gap-2"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="stroke-current">
+                    <path d="M12 5v14M5 12h14" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                  {hasExistingOverlay ? 'Change B-Roll' : 'Add B-Roll'}
+                </Button>
+
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => {
+                    if (videoVariants.length && pendingTranscriptSegment) {
+                      const variant = videoVariants[0];
+                      const deleteStartFrame = Math.round((pendingTranscriptSegment.startMs / 1000) * 30);
+                      const deleteEndFrame = Math.round((pendingTranscriptSegment.endMs / 1000) * 30);
+                      const newOverlays = variant.overlays.filter((overlay) => {
+                        return !(overlay.type === 'STOCK_VIDEO' &&
+                          overlay.startFrame <= deleteEndFrame &&
+                          (overlay.startFrame + overlay.duration) >= deleteStartFrame);
+                      });
+                      setVideoVariants([{ ...variant, overlays: newOverlays }]);
+                      toast({
+                        title: "Success",
+                        description: "B-Roll deleted successfully",
+                      });
+                      setPendingTranscriptSegment(null);
+                      setSelectedTranscriptSegment(null);
+                      setHasExistingOverlay(false);
+                    }
+                  }}
+                  disabled={!pendingTranscriptSegment || !hasExistingOverlay}
+                  className="h-8 px-3 text-sm font-medium flex items-center gap-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete B-Roll
+                </Button>
+
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setPendingTranscriptSegment(null);
+                    setSelectedTranscriptSegment(null);
+                    setSelectedText('');
+                    setHasExistingOverlay(false);
+                  }}
+                  disabled={!pendingTranscriptSegment}
+                  className="h-8 px-3 text-sm font-medium flex items-center gap-2 ml-auto"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  Clear Selection
+                </Button>
+              </div>
+
+              <div className="p-4 flex-1 overflow-y-auto">
+                <div className="mb-4">
+                  <h2 className="text-lg font-medium text-gray-900 mb-2">Highlight transcript to generate B-roll</h2>
+                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <span>Transcript</span>
+                    <button className="text-gray-400 hover:text-gray-600 flex items-center gap-1">
+                      <HelpCircle className="w-4 h-4" />
+                      Something wrong? Regenerate
+                    </button>
+                  </div>
+                </div>
+                <div
+                  ref={containerRef}
+                  id="transcript-container"
+                  className="text-2xl select-none text-gray-800 space-y-8 leading-relaxed"
+                >
+                  {renderWords()}
                 </div>
               </div>
             </div>
+
+            {/* Video Section */}
+            <div className="w-[60%] h-full flex flex-col bg-gray-50">
+              <div className="text-right p-3 text-sm text-gray-600 border-b">
+                Basic Stock videos provided by <a href="#" className="text-gray-800">Pexels</a>. <a href="#" className="text-blue-600 hover:text-blue-700">Upgrade to iStock</a>
+              </div>
+              {videoVariants.map((variant, index) => (
+                <div key={index} className="flex-1 flex items-center justify-center p-6">
+                  <div className="h-full max-h-[calc(100vh-12rem)] aspect-[9/16]">
+                    <Player
+                      component={CaptionedVideo}
+                      inputProps={{
+                        src: variant.src,
+                        overlays: variant.overlays,
+                        transcriptionUrl: variant.transcriptionUrl,
+                        showCaptions
+                      }}
+                      durationInFrames={variant.durationInFrames}
+                      fps={30}
+                      compositionHeight={1920}
+                      compositionWidth={1080}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                      }}
+                      controls
+                    />
+                  </div>
+                </div>
+              ))}
+              <div className="px-6 pb-3 text-sm text-gray-600">
+                Pro tip: If you encounter a bug while editing, try refreshing the page to resolve the issue.
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center gap-4">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="video/*"
+              onChange={handleUpload}
+              disabled={isUploading}
+              className="hidden"
+            />
+            <Button 
+              onClick={handleButtonClick}
+              disabled={isUploading}
+              className="w-64"
+            >
+              {isUploading ? 'Processing...' : 'Select Video'}
+            </Button>
+            <Button 
+              onClick={handleDemoClick}
+              disabled={isUploading}
+              variant="secondary"
+              className="w-64"
+            >
+              Load Demo Content
+            </Button>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+
+      {/* Search Assets Dialog */}
+      {isSearchOpen && (
+        <div onClick={(e) => { e.stopPropagation(); }} className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div id="asset-search-dialog" className="bg-white rounded-lg w-[90vw] max-w-4xl max-h-[90vh] flex flex-col">
+            {/* Main content area */}
+            <div className="p-6 overflow-y-auto flex-1">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-semibold">Search Assets</h2>
+                <button 
+                  onClick={() => {
+                    setIsSearchOpen(false);
+                    setSelectedVideo(null);
+                  }}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              </div>
+              
+              <div className="flex gap-4 mb-6">
+                <div className="flex-1 relative">
+                  <input
+                    type="text"
+                    placeholder="Search..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full px-4 py-2 border rounded-lg pr-10"
+                  />
+                  <svg 
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                    xmlns="http://www.w3.org/2000/svg" 
+                    width="20" 
+                    height="20" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    strokeWidth="2" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round"
+                  >
+                    <circle cx="11" cy="11" r="8"/>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                  </svg>
+                </div>
+                <Button onClick={handleSearch}>
+                  Search
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                {searchResults.map((result, index) => (
+                  <div 
+                    key={index} 
+                    className={`aspect-[9/16] relative rounded-lg overflow-hidden cursor-pointer transition-all
+                              ${selectedVideo?.videoSrc === result.videoSrc ? 'ring-4 ring-blue-500' : 'hover:ring-2 hover:ring-blue-300'}`}
+                    onClick={() => setSelectedVideo(result)}
+                  >
+                    <video 
+                      src={result.videoSrc}
+                      className="w-full h-full object-cover"
+                      loop
+                      muted
+                      onMouseEnter={e => e.currentTarget.play()}
+                      onMouseLeave={e => {
+                        e.currentTarget.pause();
+                        e.currentTarget.currentTime = 0;
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Fixed banner at bottom */}
+            <div className="border-t border-gray-200 p-4 bg-white rounded-b-lg">
+              <div className="flex justify-end">
+                <Button
+                  onClick={handleContinueClick}
+                  disabled={!selectedVideo}
+                  className={!selectedVideo ? 'opacity-50 cursor-not-allowed' : ''}
+                >
+                  Continue
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 } 
