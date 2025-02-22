@@ -74,17 +74,6 @@ const useHighlights = (transcript: TranscriptLine[], videoVariants: VideoVariant
         const overlayStartMs = (overlay.startFrame / 30) * 1000;
         const overlayEndMs = ((overlay.startFrame + overlay.duration) / 30) * 1000;
 
-        console.log('🎨 Overlay to Highlight Conversion:', {
-          overlay: {
-            startFrame: overlay.startFrame,
-            duration: overlay.duration
-          },
-          timeMs: {
-            start: overlayStartMs,
-            end: overlayEndMs
-          }
-        });
-
         // Find the first word that starts at or after the overlay start time
         const startIndex = words.findIndex(wordObj => wordObj.timeMs >= overlayStartMs);
         
@@ -93,36 +82,9 @@ const useHighlights = (transcript: TranscriptLine[], videoVariants: VideoVariant
           const wordEndMs = transcript[wordObj.segmentIndex].endMs;
           return wordEndMs <= overlayEndMs;
         });
-        
-        console.log('📝 Word Index Calculation:', {
-          startIndex,
-          endIndex,
-          words: {
-            start: words[startIndex]?.word,
-            end: words[endIndex]?.word
-          },
-          times: {
-            startWord: words[startIndex]?.timeMs,
-            endWord: words[endIndex]?.timeMs
-          }
-        });
+
         
         if (startIndex !== -1 && endIndex !== -1 && startIndex <= endIndex) {
-          console.log('🎨 Highlight Recalculation:', {
-            frames: {
-              start: overlay.startFrame,
-              duration: overlay.duration,
-              end: overlay.startFrame + overlay.duration
-            },
-            indices: {
-              start: startIndex,
-              end: endIndex
-            },
-            words: {
-              start: words[startIndex].word,
-              end: words[endIndex].word
-            }
-          });
           highlights.push({
             id: overlay.startFrame.toString(),
             start: startIndex,
@@ -405,9 +367,9 @@ export function StockVideoUploader() {
       });
       
       const isHovered = highlight && hoveredHighlight === highlight.id;
-      const isSelected = selectionStart !== null && 
-        index >= Math.min(selectionStart, selectionEnd || selectionStart) && 
-        index <= Math.max(selectionStart, selectionEnd || selectionStart);
+      const isSelected = pendingTranscriptSegment && 
+        wordObj.timeMs >= pendingTranscriptSegment.startMs && 
+        wordObj.timeMs <= pendingTranscriptSegment.endMs;
       
       const isHighlightStart = highlight && index === highlight.start;
       const isHighlightEnd = highlight && index === highlight.end;
@@ -415,9 +377,8 @@ export function StockVideoUploader() {
       const wrapperClasses = [
         'relative',
         'inline',
-        highlight ? 'bg-amber-200/75' : '',
+        highlight || isSelected ? 'bg-amber-200/75' : '',
         isHovered ? 'bg-amber-200/90' : '',
-        isSelected ? 'bg-amber-200/50' : '',
         isHighlightStart ? 'pl-2 rounded-l-sm' : '',
         isHighlightEnd ? 'pr-2 rounded-r-sm' : '',
         'transition-colors duration-150',
@@ -472,76 +433,34 @@ export function StockVideoUploader() {
 
     const text = selection.toString().trim();
     if (text) {
-      console.log('Text Selection:', {
-        selectedText: text,
-        selectionLength: text.length
-      });
-
+      // Get the range and find the start and end word indices
       const range = selection.getRangeAt(0);
-      const container = range.startContainer;
-      const textContent = container.textContent || '';
-      const selectionStart = range.startOffset;
-      const selectionEnd = range.endOffset;
-
-      // Find all transcript segments that overlap with the selection
-      const overlappingSegments = transcript.filter(segment => {
-        const segmentStartInText = textContent.indexOf(segment.text);
-        if (segmentStartInText === -1) return false;
-        const segmentEndInText = segmentStartInText + segment.text.length;
-
-        const isOverlapping = (
-          (selectionStart <= segmentStartInText && selectionEnd >= segmentEndInText) ||
-          (segmentStartInText <= selectionStart && segmentEndInText >= selectionEnd) ||
-          (selectionStart <= segmentStartInText && selectionEnd >= segmentStartInText) ||
-          (selectionStart <= segmentEndInText && selectionEnd >= segmentEndInText)
-        );
-
-        return isOverlapping;
-      });
-
-      if (overlappingSegments.length > 0 && videoVariants.length) {
-        const selectedTextStart = textContent.indexOf(text, selectionStart);
-        const selectedTextEnd = selectedTextStart + text.length;
-
-        const sortedSegments = overlappingSegments.sort((a, b) => {
-          const aStart = textContent.indexOf(a.text);
-          const bStart = textContent.indexOf(b.text);
-          const aDistance = Math.abs(aStart - selectedTextStart);
-          const bDistance = Math.abs(bStart - selectedTextStart);
-          return aDistance - bDistance;
-        });
-
-        const firstSegment = sortedSegments[0];
-        const lastSegment = sortedSegments[sortedSegments.length - 1];
+      const startContainer = range.startContainer;
+      const endContainer = range.endContainer;
+      
+      // Find the word elements that contain the selection
+      const startWordElement = startContainer.parentElement?.closest('[data-word-index]');
+      const endWordElement = endContainer.parentElement?.closest('[data-word-index]');
+      
+      if (startWordElement && endWordElement) {
+        const startIndex = parseInt(startWordElement.getAttribute('data-word-index') || '0');
+        const endIndex = parseInt(endWordElement.getAttribute('data-word-index') || '0');
         
-        const combinedSegment = {
-          text: text,
-          startMs: firstSegment.startMs,
-          endMs: lastSegment.endMs
+        // Create a segment from the selected words
+        const selectedWords = words.slice(startIndex, endIndex + 1);
+        const segment = {
+          text: selectedWords.map(w => w.word).join(' '),
+          startMs: transcript[selectedWords[0].segmentIndex].startMs,
+          endMs: transcript[selectedWords[selectedWords.length - 1].segmentIndex].endMs
         };
 
-        setSelectedTranscriptSegment(combinedSegment);
-        setPendingTranscriptSegment(combinedSegment);
-
-        const startFrame = Math.round((combinedSegment.startMs / 1000) * 30);
-        const endFrame = Math.round((combinedSegment.endMs / 1000) * 30);
-        
-        // Check if there's an existing overlay
-        const existingOverlay = videoVariants[0].overlays.find(overlay => 
-          overlay.type === 'STOCK_VIDEO' && 
-          overlay.startFrame <= endFrame && 
-          (overlay.startFrame + overlay.duration) >= startFrame
-        );
-
-        setHasExistingOverlay(!!existingOverlay);
-      } else {
+        setSelectedTranscriptSegment(segment);
+        setPendingTranscriptSegment(segment);
         setHasExistingOverlay(false);
-        setSelectedTranscriptSegment(null);
-        setPendingTranscriptSegment(null);
+        
+        // Clear the selection
+        window.getSelection()?.removeAllRanges();
       }
-
-      setSelectedText(text);
-      setSelectedRange(range);
     }
   };
 
@@ -844,14 +763,28 @@ export function StockVideoUploader() {
   const handleSearch = async () => {
     if (!searchTerm.trim()) return;
 
+    console.log('🔍 Starting Search:', {
+      searchTerm,
+      pendingSegment: pendingTranscriptSegment ? {
+        text: pendingTranscriptSegment.text,
+        startMs: pendingTranscriptSegment.startMs,
+        endMs: pendingTranscriptSegment.endMs
+      } : null
+    });
+
     try {
       const response = await fetch(`/api/search-videos?term=${encodeURIComponent(searchTerm)}`);
       if (!response.ok) throw new Error('Search failed');
       
       const data = await response.json();
+      console.log('🎥 Search Results:', {
+        resultCount: data.videos?.length || 0,
+        firstResult: data.videos?.[0]
+      });
+      
       setSearchResults(data.videos || []);
     } catch (error) {
-      console.error('Search error:', error);
+      console.error('❌ Search error:', error);
       toast({
         title: "Error",
         description: "Failed to search videos. Please try again.",
@@ -1001,21 +934,25 @@ export function StockVideoUploader() {
   // Update the Continue button click handler in the search dialog
   const handleContinueClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    console.log('🔍 Continue Click:', {
+    console.log('🎬 Continue Click - Initial State:', {
       selectedVideo,
-      pendingSegment: pendingTranscriptSegment,
-      currentOverlays: videoVariants[0]?.overlays.map(o => ({
-        type: o.type,
-        startFrame: o.startFrame,
-        duration: o.duration,
-        timeRange: {
-          start: (o.startFrame / 30) * 1000,
-          end: ((o.startFrame + o.duration) / 30) * 1000
-        }
-      }))
+      pendingSegment: {
+        text: pendingTranscriptSegment?.text,
+        startMs: pendingTranscriptSegment?.startMs,
+        endMs: pendingTranscriptSegment?.endMs
+      },
+      currentVariant: videoVariants[0] ? {
+        overlayCount: videoVariants[0].overlays.length,
+        src: videoVariants[0].src
+      } : null
     });
 
     if (!selectedVideo || !pendingTranscriptSegment || !videoVariants.length) {
+      console.error('❌ Missing required data:', {
+        hasSelectedVideo: !!selectedVideo,
+        hasPendingSegment: !!pendingTranscriptSegment,
+        hasVideoVariants: videoVariants.length > 0
+      });
       toast({
         title: "Error",
         description: "Missing required data for video replacement",
@@ -1028,13 +965,35 @@ export function StockVideoUploader() {
     const startFrame = Math.round((pendingTranscriptSegment.startMs / 1000) * 30);
     const duration = Math.round(((pendingTranscriptSegment.endMs - pendingTranscriptSegment.startMs) / 1000) * 30);
 
+    console.log('🎯 Calculated Frames:', {
+      startFrame,
+      duration,
+      timing: {
+        startMs: pendingTranscriptSegment.startMs,
+        endMs: pendingTranscriptSegment.endMs,
+        durationMs: pendingTranscriptSegment.endMs - pendingTranscriptSegment.startMs
+      }
+    });
+
     // Remove any existing overlays that overlap with this time range
     const nonOverlappingOverlays = variant.overlays.filter(overlay => {
       if (overlay.type !== TemplateType.STOCK_VIDEO) return true;
       const overlayStartMs = (overlay.startFrame / 30) * 1000;
       const overlayEndMs = ((overlay.startFrame + overlay.duration) / 30) * 1000;
-      return overlayEndMs <= pendingTranscriptSegment.startMs || 
+      const doesNotOverlap = overlayEndMs <= pendingTranscriptSegment.startMs || 
              overlayStartMs >= pendingTranscriptSegment.endMs;
+      
+      console.log('🔍 Checking Overlay Overlap:', {
+        overlay: {
+          startFrame: overlay.startFrame,
+          duration: overlay.duration,
+          startMs: overlayStartMs,
+          endMs: overlayEndMs
+        },
+        doesNotOverlap
+      });
+      
+      return doesNotOverlap;
     });
 
     // Add the new overlay
@@ -1046,10 +1005,30 @@ export function StockVideoUploader() {
       provider: 'Pexels'
     };
 
-    setVideoVariants([{
+    console.log('✨ New Overlay Created:', {
+      newOverlay,
+      existingOverlaysKept: nonOverlappingOverlays.length,
+      totalOverlaysAfter: nonOverlappingOverlays.length + 1
+    });
+
+    const updatedVariant = {
       ...variant,
       overlays: [...nonOverlappingOverlays, newOverlay]
-    }]);
+    };
+
+    console.log('📼 Final Variant Update:', {
+      overlaysCount: {
+        before: variant.overlays.length,
+        after: updatedVariant.overlays.length
+      },
+      newOverlayDetails: {
+        startFrame: newOverlay.startFrame,
+        duration: newOverlay.duration,
+        videoSrc: newOverlay.videoSrc
+      }
+    });
+
+    setVideoVariants([updatedVariant]);
 
     // Reset states
     setIsSearchOpen(false);
