@@ -108,12 +108,34 @@ const useHighlights = (transcript: TranscriptLine[], videoVariants: VideoVariant
     
     if (!currentOverlay) return;
 
+    console.log('🎯 Updating Highlight:', {
+      id,
+      type,
+      newStart,
+      newEnd,
+      currentOverlay,
+      wordAtStart: words[newStart],
+      wordAtEnd: words[newEnd]
+    });
+
+    let newHighlightId = id;
     const updatedOverlays = variant.overlays.map(overlay => {
         if (overlay.type === TemplateType.STOCK_VIDEO && overlay.startFrame.toString() === id) {
             if (type === 'start') {
                 // Only update start frame, keep original end frame
                 const newStartFrame = Math.round((words[newStart].timeMs / 1000) * 30);
                 const currentEndFrame = overlay.startFrame + overlay.duration;
+                
+                console.log('📏 Left Handle Update:', {
+                    newStartFrame,
+                    currentEndFrame,
+                    wordTiming: words[newStart].timeMs,
+                    resultingDuration: currentEndFrame - newStartFrame
+                });
+
+                // Store the new ID for the highlight
+                newHighlightId = newStartFrame.toString();
+
                 return {
                     ...overlay,
                     startFrame: newStartFrame,
@@ -132,6 +154,23 @@ const useHighlights = (transcript: TranscriptLine[], videoVariants: VideoVariant
         return overlay;
     });
     
+    console.log('✨ Overlay Update Result:', {
+        originalOverlaysCount: variant.overlays.length,
+        updatedOverlaysCount: updatedOverlays.length,
+        updatedOverlay: updatedOverlays.find(o => o.type === TemplateType.STOCK_VIDEO && o.startFrame.toString() === newHighlightId),
+        oldId: id,
+        newId: newHighlightId
+    });
+
+    // Update the active highlight ID if it changed
+    if (newHighlightId !== id) {
+        console.log('🔄 Updating Active Highlight ID:', {
+            from: id,
+            to: newHighlightId
+        });
+        setActiveHighlight(newHighlightId);
+    }
+
     setVideoVariants([{ ...variant, overlays: updatedOverlays }]);
   };
 
@@ -245,11 +284,16 @@ export function StockVideoUploader() {
 
   const handleMouseDown = (e: React.MouseEvent, highlightId: string | null = null, type: string | null = null) => {
     const wordIndex = (e.target as HTMLElement).getAttribute('data-word-index');
-    console.log('🎯 Selection Start:', {
+    console.log('🔽 Handle MouseDown:', {
+      highlightId,
+      handleType: type,
       wordIndex,
       isHandle: !!highlightId,
-      handleType: type,
-      words: wordIndex ? words[parseInt(wordIndex)].word : null
+      currentDragState: {
+        isDragging,
+        activeHighlight,
+        dragType
+      }
     });
     
     e.preventDefault();
@@ -276,39 +320,90 @@ export function StockVideoUploader() {
     const wordIndex = getWordIndexAtPosition(e.clientX, e.clientY);
     if (wordIndex === null) return;
 
-    // Only log when the wordIndex changes
+    // Only log when wordIndex changes to avoid console spam
     if (wordIndex !== selectionEnd) {
-      console.log('📏 Selection Update:', {
-        start: selectionStart !== null ? words[selectionStart].word : null,
-        end: words[wordIndex].word,
-        startIndex: selectionStart,
-        endIndex: wordIndex,
-        isDragging
+      console.log('➡️ Handle MouseMove:', {
+        activeHighlight,
+        dragType,
+        wordIndex,
+        currentSelection: {
+          start: selectionStart,
+          end: selectionEnd
+        },
+        highlightInfo: activeHighlight ? highlights.find(h => h.id === activeHighlight) : null
       });
     }
 
     if (activeHighlight) {
+      // Find the highlight and cache it to prevent losing reference
       const highlight = highlights.find(h => h.id === activeHighlight);
-      if (highlight) {
-        if (dragType === 'start') {
-          if (wordIndex <= highlight.end) {
-            updateHighlightDuration(activeHighlight, wordIndex, highlight.end, 'start');
+      console.log('🔍 Active Highlight State:', {
+        foundHighlight: !!highlight,
+        highlightDetails: highlight,
+        activeHighlightId: activeHighlight,
+        availableHighlights: highlights.map(h => h.id)
+      });
+
+      if (!highlight) {
+        // If we lost the highlight reference, try to recover it from the overlays
+        const variant = videoVariants[0];
+        if (variant) {
+          const overlayId = activeHighlight;
+          const overlay = variant.overlays.find(o => 
+            o.type === TemplateType.STOCK_VIDEO && 
+            o.startFrame.toString() === overlayId
+          );
+          
+          if (overlay) {
+            // Recalculate the highlight bounds
+            const startMs = (overlay.startFrame / 30) * 1000;
+            const endMs = ((overlay.startFrame + overlay.duration) / 30) * 1000;
+            
+            // Find word indices that match these times
+            const startIndex = words.findIndex(w => w.timeMs >= startMs);
+            const endIndex = words.findLastIndex(w => w.timeMs <= endMs);
+            
+            console.log('🔄 Recovered Highlight:', {
+              startIndex,
+              endIndex,
+              startMs,
+              endMs,
+              overlay
+            });
+
+            if (startIndex !== -1 && endIndex !== -1) {
+              // Use recovered indices
+              if (dragType === 'start' && wordIndex <= endIndex) {
+                updateHighlightDuration(activeHighlight, wordIndex, endIndex, 'start');
+              } else if (dragType === 'end' && wordIndex >= startIndex) {
+                updateHighlightDuration(activeHighlight, startIndex, wordIndex, 'end');
+              }
+              return;
+            }
           }
-        } else if (dragType === 'end') {
-          if (wordIndex >= highlight.start) {
-            updateHighlightDuration(activeHighlight, highlight.start, wordIndex, 'end');
-          }
+        }
+        console.warn('❌ Could not recover highlight reference');
+        return;
+      }
+
+      if (dragType === 'start') {
+        console.log('⬅️ Left Handle Move:', {
+          proposedStartIndex: wordIndex,
+          currentEndIndex: highlight.end,
+          wouldBeValid: wordIndex <= highlight.end,
+          currentHighlight: highlight
+        });
+        
+        if (wordIndex <= highlight.end) {
+          updateHighlightDuration(activeHighlight, wordIndex, highlight.end, 'start');
+        }
+      } else if (dragType === 'end') {
+        if (wordIndex >= highlight.start) {
+          updateHighlightDuration(activeHighlight, highlight.start, wordIndex, 'end');
         }
       }
     } else if (selectionStart !== null) {
-      const prevEnd = selectionEnd; // Store previous end for debugging
       setSelectionEnd(wordIndex);
-      
-      console.log('🎯 Setting new selection end:', {
-        from: prevEnd,
-        to: wordIndex,
-        isDragging
-      });
       
       const start = Math.min(selectionStart, wordIndex);
       const end = Math.max(selectionStart, wordIndex);
@@ -326,29 +421,21 @@ export function StockVideoUploader() {
   };
 
   const handleMouseUp = () => {
+    console.log('🔼 Handle MouseUp:', {
+      finalState: {
+        activeHighlight,
+        dragType,
+        isDragging,
+        selectionStart,
+        selectionEnd
+      },
+      highlightInfo: activeHighlight ? highlights.find(h => h.id === activeHighlight) : null
+    });
+
     // Capture values before state updates
     const finalStart = selectionStart;
     const finalEnd = selectionEnd;
     
-    console.log('🔍 Final Selection State:', {
-      isDragging,
-      selectionRange: finalStart !== null && finalEnd !== null ? {
-        start: {
-          index: finalStart,
-          word: words[finalStart].word
-        },
-        end: {
-          index: finalEnd,
-          word: words[finalEnd].word
-        },
-        text: words.slice(
-          Math.min(finalStart, finalEnd),
-          Math.max(finalStart, finalEnd) + 1
-        ).map(w => w.word).join(' ')
-      } : null,
-      isExistingHighlight: !!activeHighlight
-    });
-
     if (isDragging && !activeHighlight && finalStart !== null && finalEnd !== null) {
       const start = Math.min(finalStart, finalEnd);
       const end = Math.max(finalStart, finalEnd);
