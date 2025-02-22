@@ -284,33 +284,28 @@ export function StockVideoUploader() {
 
   const handleMouseDown = (e: React.MouseEvent, highlightId: string | null = null, type: string | null = null) => {
     const wordIndex = (e.target as HTMLElement).getAttribute('data-word-index');
-    console.log('🔽 Handle MouseDown:', {
-      highlightId,
-      handleType: type,
-      wordIndex,
-      isHandle: !!highlightId,
-      currentDragState: {
-        isDragging,
-        activeHighlight,
-        dragType
-      }
-    });
+    if (wordIndex) {  // Only log if we actually clicked a word
+        console.log('🎯 Word Click:', {
+            word: words[parseInt(wordIndex)].word,
+            action: highlightId ? 'adjust-highlight' : 'new-selection'
+        });
+    }
     
     e.preventDefault();
     if (highlightId) {
-      setActiveHighlight(highlightId);
-      setDragType(type);
-      setIsDragging(true);
-    } else {
-      const wordIndex = getWordIndexAtPosition(e.clientX, e.clientY);
-      if (wordIndex !== null) {
-        setSelectionStart(wordIndex);
-        setSelectionEnd(wordIndex);
+        setActiveHighlight(highlightId);
+        setDragType(type);
         setIsDragging(true);
-        setSelectedTranscriptSegment(null);
-        setPendingTranscriptSegment(null);
-        setHasExistingOverlay(false);
-      }
+    } else {
+        const wordIndex = getWordIndexAtPosition(e.clientX, e.clientY);
+        if (wordIndex !== null) {
+            setSelectionStart(wordIndex);
+            setSelectionEnd(wordIndex);
+            setIsDragging(true);
+            setSelectedTranscriptSegment(null);
+            setPendingTranscriptSegment(null);
+            setHasExistingOverlay(false);
+        }
     }
   };
 
@@ -421,40 +416,31 @@ export function StockVideoUploader() {
   };
 
   const handleMouseUp = () => {
-    console.log('🔼 Handle MouseUp:', {
-      finalState: {
-        activeHighlight,
-        dragType,
-        isDragging,
-        selectionStart,
-        selectionEnd
-      },
-      highlightInfo: activeHighlight ? highlights.find(h => h.id === activeHighlight) : null
-    });
+    // For single-word click or drag selection
+    if (isDragging && !activeHighlight && selectionStart !== null && selectionEnd !== null) {
+        const start = Math.min(selectionStart, selectionEnd);
+        const end = Math.max(selectionStart, selectionEnd);
+        const selectedWords = words.slice(start, end + 1);
+        
+        if (selectedWords.length > 0) {
+            const segment = {
+                text: selectedWords.map(w => w.word).join(' '),
+                startMs: transcript[selectedWords[0].segmentIndex].startMs,
+                endMs: transcript[selectedWords[selectedWords.length - 1].segmentIndex].endMs
+            };
+            
+            console.log('🎯 Segment:', {
+                text: segment.text,
+                action: 'created'
+            });
 
-    // Capture values before state updates
-    const finalStart = selectionStart;
-    const finalEnd = selectionEnd;
-    
-    if (isDragging && !activeHighlight && finalStart !== null && finalEnd !== null) {
-      const start = Math.min(finalStart, finalEnd);
-      const end = Math.max(finalStart, finalEnd);
-      const selectedWords = words.slice(start, end + 1);
-      
-      if (selectedWords.length > 0) {
-        const segment = {
-          text: selectedWords.map(w => w.word).join(' '),
-          startMs: transcript[selectedWords[0].segmentIndex].startMs,
-          endMs: transcript[selectedWords[selectedWords.length - 1].segmentIndex].endMs
-        };
-
-        setSelectedTranscriptSegment(segment);
-        setPendingTranscriptSegment(segment);
-        setHasExistingOverlay(false);
-      }
+            setSelectedTranscriptSegment(segment);
+            setPendingTranscriptSegment(segment);
+            setHasExistingOverlay(false);
+        }
     }
 
-    // Clear states after processing
+    // Only clear the selection states, but keep the segment
     setIsDragging(false);
     setActiveHighlight(null);
     setDragType(null);
@@ -518,46 +504,59 @@ export function StockVideoUploader() {
 
   // Update the renderWords function
   const renderWords = () => {
-    return words.map((wordObj, index) => {
-      const highlight = highlights.find(h => {
-        return index >= h.start && index <= h.end;
-      });
-      
+    let paragraphs: JSX.Element[][] = [[]];
+    let currentParagraph = 0;
+
+    words.forEach((wordObj, index) => {
+      // Find highlight data for this particular word index
+      const highlight = highlights.find(h => index >= h.start && index <= h.end);
+
+      // Check states that could cause highlighting
+      const isInSelection =
+        selectionStart !== null &&
+        selectionEnd !== null &&
+        index >= Math.min(selectionStart, selectionEnd) &&
+        index <= Math.max(selectionStart, selectionEnd);
+
+      const isSelected = 
+        (pendingTranscriptSegment &&
+         wordObj.timeMs >= pendingTranscriptSegment.startMs && 
+         wordObj.timeMs <= pendingTranscriptSegment.endMs) ||
+        isInSelection;
+
       const isHovered = highlight && hoveredHighlight === highlight.id;
-      
-      // Check if word is in current selection range
-      const isInSelection = selectionStart !== null && selectionEnd !== null && (
-        (index >= Math.min(selectionStart, selectionEnd) && 
-         index <= Math.max(selectionStart, selectionEnd))
-      );
-      
-      const isSelected = (pendingTranscriptSegment && 
-        wordObj.timeMs >= pendingTranscriptSegment.startMs && 
-        wordObj.timeMs <= pendingTranscriptSegment.endMs) || isInSelection;
-      
       const isHighlightStart = highlight && index === highlight.start;
       const isHighlightEnd = highlight && index === highlight.end;
-      
+
       const wrapperClasses = [
         'relative',
         'inline',
+        'group',
         highlight || isSelected ? 'bg-amber-200/75' : '',
         isHovered ? 'bg-amber-200/90' : '',
-        isHighlightStart ? 'pl-2 rounded-l-sm' : '',
-        isHighlightEnd ? 'pr-2 rounded-r-sm' : '',
+        isHighlightStart ? 'rounded-l-sm pl-3' : '',
+        isHighlightEnd ? 'rounded-r-sm pr-3' : '',
         'transition-colors duration-150',
         'cursor-pointer',
-        'text-2xl',
-        'select-none', // Prevent text selection
+        'text-xl',
+        'select-none', // Prevent manual text selection
       ].filter(Boolean).join(' ');
-      
-      return (
+
+      // Check if a new paragraph should start
+      const startsWithCapital = /^[A-Z]/.test(wordObj.word);
+      const isFirstWord = index === 0;
+      const prevWordEndsPunctuation = index > 0 && /[.!?]$/.test(words[index - 1].word);
+      if (startsWithCapital && (isFirstWord || prevWordEndsPunctuation)) {
+        currentParagraph++;
+        paragraphs[currentParagraph] = [];
+      }
+
+      const wordElement = (
         <span
           key={index}
           data-word-index={index}
           className={wrapperClasses}
           onMouseDown={(e) => {
-            // If clicking on a highlight, handle it differently
             if (highlight) {
               e.preventDefault();
               handleHighlightClick(e, {
@@ -579,18 +578,18 @@ export function StockVideoUploader() {
             setHoveredHighlight(null);
           }}
         >
-          {isHighlightStart && (
+          {highlight && isHighlightStart && (
             <span
-              className="absolute left-0.5 top-1/2 -translate-y-1/2 w-1.5 h-5 cursor-ew-resize bg-amber-400 hover:bg-amber-500 transition-colors rounded-full shadow-sm hover:shadow-md"
+              className="absolute left-0.5 top-1/2 -translate-y-1/2 w-1 h-4 cursor-ew-resize bg-amber-400 hover:bg-amber-500 transition-colors rounded-full shadow-sm hover:shadow-md opacity-0 group-hover:opacity-100"
               onMouseDown={(e) => {
                 e.stopPropagation();
                 handleMouseDown(e, highlight.id, 'start');
               }}
             />
           )}
-          {isHighlightEnd && (
+          {highlight && isHighlightEnd && (
             <span
-              className="absolute right-0.5 top-1/2 -translate-y-1/2 w-1.5 h-5 cursor-ew-resize bg-amber-400 hover:bg-amber-500 transition-colors rounded-full shadow-sm hover:shadow-md"
+              className="absolute right-0.5 top-1/2 -translate-y-1/2 w-1 h-4 cursor-ew-resize bg-amber-400 hover:bg-amber-500 transition-colors rounded-full shadow-sm hover:shadow-md opacity-0 group-hover:opacity-100"
               onMouseDown={(e) => {
                 e.stopPropagation();
                 handleMouseDown(e, highlight.id, 'end');
@@ -600,7 +599,15 @@ export function StockVideoUploader() {
           {wordObj.word + " "}
         </span>
       );
+
+      paragraphs[currentParagraph].push(wordElement);
     });
+
+    return paragraphs.map((paragraph, index) => (
+      <p key={index} className="mb-4">
+        {paragraph}
+      </p>
+    ));
   };
 
   const handleTextSelection = () => {
@@ -656,26 +663,15 @@ export function StockVideoUploader() {
   };
 
   const handleManualSelect = () => {
-    console.log('🎯 Selection State:', {
-      segmentText: selectedTranscriptSegment?.text,
-      wordRange: selectionStart !== null && selectionEnd !== null ? 
-        words.slice(selectionStart, selectionEnd + 1).map(w => w.word).join(' ') : null
+    console.log('🎯 Add B-Roll:', {
+        selectedWord: selectedTranscriptSegment?.text,
+        action: 'opening-search'
     });
     
     if (selectedTranscriptSegment) {
-      setPendingTranscriptSegment(selectedTranscriptSegment);
-      setSearchTerm(selectedTranscriptSegment.text || selectedText);
-      setIsSearchOpen(true);
-      
-      console.log('2. State Updates:', {
-        segment: selectedTranscriptSegment,
-        searchTerm: selectedTranscriptSegment.text || selectedText,
-        words: words
-      });
-      
-      window.getSelection()?.removeAllRanges();
-      setSelectedText('');
-      setHasExistingOverlay(true);
+        setPendingTranscriptSegment(selectedTranscriptSegment);
+        setSearchTerm(selectedTranscriptSegment.text || selectedText);
+        setIsSearchOpen(true);
     }
   };
 
@@ -697,29 +693,22 @@ export function StockVideoUploader() {
   };
 
   const handleClickAway = () => {
-    console.log('handleClickAway - Entry point with state:', {
-      isSearchOpen,
-      hasSelectedTranscriptSegment: !!selectedTranscriptSegment,
-      hasPendingTranscriptSegment: !!pendingTranscriptSegment
+    console.log('🎯 ClickAway - Entry:', {
+        isSearchOpen,
+        hasSelectedSegment: !!selectedTranscriptSegment,
+        hasPendingSegment: !!pendingTranscriptSegment
     });
     
     setSelectedText('');
     setHasExistingOverlay(false);
     
     if (!isSearchOpen) {
-      console.log('handleClickAway - Clearing transcript segments because isSearchOpen is false');
-      setSelectedTranscriptSegment(null);
-      setPendingTranscriptSegment(null);
+        console.log('🎯 ClickAway - Clearing segments because search is closed');
+        setSelectedTranscriptSegment(null);
+        setPendingTranscriptSegment(null);
     } else {
-      console.log('handleClickAway - Preserving transcript segments because isSearchOpen is true');
+        console.log('🎯 ClickAway - Preserving segments because search is open');
     }
-    
-    if (selectedRange) {
-      window.getSelection()?.removeAllRanges();
-      setSelectedRange(null);
-    }
-    
-    console.log('handleClickAway - Exit point');
   };
 
   const extractAudioFromVideo = async (videoFile: File): Promise<{ audioBlob: Blob, durationInFrames: number }> => {
@@ -843,7 +832,7 @@ export function StockVideoUploader() {
 
     try {
       const demoVideoUrl = 'https://hx7mp5wayo6ybdwl.public.blob.vercel-storage.com/IMG_6062-ustELCsT8kuxTiuEmUhR0NTEefvx6P.MP4';
-      const demoTranscriptUrl = 'https://hx7mp5wayo6ybdwl.public.blob.vercel-storage.com/transcriptions/14-LPluQMfijVrCEOY2nAiqc4yTzuvPYR.json';
+      const demoTranscriptUrl = 'https://hx7mp5wayo6ybdwl.public.blob.vercel-storage.com/transcript-YxnHCXJcmH4JJqN5LH4M7r79CprrIa.json';
 
       // Mock overlays based on the logs
       const mockOverlays: OverlayConfig[] = [
@@ -980,12 +969,35 @@ export function StockVideoUploader() {
     const startFrame = Math.round((startMs / 1000) * 30); // 30 fps
     const endFrame = Math.round((endMs / 1000) * 30);
     
-    return currentVariant.overlays.find(overlay => {
-      const overlayEndFrame = overlay.startFrame + overlay.duration;
-      return overlay.type === 'STOCK_VIDEO' &&
-             ((startFrame >= overlay.startFrame && startFrame <= overlayEndFrame) ||
-              (endFrame >= overlay.startFrame && endFrame <= overlayEndFrame));
+    console.log('🔍 getMatchingStockVideo:', {
+      input: { startMs, endMs },
+      frames: { startFrame, endFrame }
     });
+
+    const matchingOverlay = currentVariant.overlays.find(overlay => {
+      if (overlay.type !== 'STOCK_VIDEO') return false;
+      const overlayEndFrame = overlay.startFrame + overlay.duration;
+      const overlayStartMs = (overlay.startFrame / 30) * 1000;
+      const overlayEndMs = (overlayEndFrame / 30) * 1000;
+
+      const isMatching = ((startMs >= overlayStartMs && startMs <= overlayEndMs) ||
+                         (endMs >= overlayStartMs && endMs <= overlayEndMs));
+
+      console.log('  Checking overlay:', {
+        overlay: {
+          startFrame: overlay.startFrame,
+          endFrame: overlayEndFrame,
+          startMs: overlayStartMs,
+          endMs: overlayEndMs
+        },
+        isMatching
+      });
+
+      return isMatching;
+    });
+
+    console.log('  Found matching overlay:', matchingOverlay);
+    return matchingOverlay;
   };
 
   // Group consecutive segments that belong to the same overlay
@@ -1031,6 +1043,16 @@ export function StockVideoUploader() {
   };
 
   const handleSegmentClick = (event: React.MouseEvent, wordIndex: number) => {
+    console.log('🎯 handleSegmentClick - Initial:', {
+      wordIndex,
+      clickedWord: words[wordIndex],
+      existingHighlights: highlights.map(h => ({
+        id: h.id,
+        range: { start: h.start, end: h.end },
+        words: words.slice(h.start, h.end + 1).map(w => w.word).join(' ')
+      }))
+    });
+    
     const clickedWord = words[wordIndex];
     
     // First check if this word is part of an existing highlight
@@ -1039,13 +1061,38 @@ export function StockVideoUploader() {
     );
 
     if (existingHighlight) {
-      // If clicking an existing highlight, use its full range
+      console.log('  Clicked existing highlight:', {
+        highlight: {
+          id: existingHighlight.id,
+          range: { start: existingHighlight.start, end: existingHighlight.end },
+          words: words.slice(existingHighlight.start, existingHighlight.end + 1).map(w => w.word).join(' ')
+        }
+      });
+      
+      // If clicking an existing highlight, use its exact range
       const highlightWords = words.slice(existingHighlight.start, existingHighlight.end + 1);
+      
+      // Find the exact transcript segments that contain our start and end words
+      const startWord = highlightWords[0];
+      const endWord = highlightWords[highlightWords.length - 1];
+      
+      const startSegment = transcript[startWord.segmentIndex];
+      const endSegment = transcript[endWord.segmentIndex];
+      
       const segment = {
         text: highlightWords.map(w => w.word).join(' '),
-        startMs: transcript[highlightWords[0].segmentIndex].startMs,
-        endMs: transcript[highlightWords[highlightWords.length - 1].segmentIndex].endMs
+        startMs: startSegment.startMs,
+        endMs: endSegment.endMs
       };
+
+      console.log('  Created segment from highlight with exact boundaries:', {
+        segment,
+        highlightWords: highlightWords.map(w => w.word),
+        startWord,
+        endWord,
+        startSegment,
+        endSegment
+      });
 
       setSelectedTranscriptSegment(segment);
       setPendingTranscriptSegment(segment);
@@ -1053,13 +1100,22 @@ export function StockVideoUploader() {
       return;
     }
     
-    // If not clicking a highlight, find the segment as before
-    const segment = transcript.find(seg => 
-      clickedWord.timeMs >= seg.startMs && 
-      clickedWord.timeMs <= seg.endMs
-    );
-
-    if (segment) {
+    // If not clicking a highlight, find the exact segment for the clicked word
+    const wordSegment = transcript[clickedWord.segmentIndex];
+    
+    if (wordSegment) {
+      console.log('  Found matching word segment:', {
+        wordSegment,
+        clickedWord
+      });
+      
+      // Create a segment that only includes this word's timing
+      const segment = {
+        text: clickedWord.word,
+        startMs: wordSegment.startMs,
+        endMs: wordSegment.endMs
+      };
+      
       setSelectedTranscriptSegment(segment);
       setPendingTranscriptSegment(segment);
       setHasExistingOverlay(false);
@@ -1352,7 +1408,7 @@ export function StockVideoUploader() {
                 <div
                   ref={containerRef}
                   id="transcript-container"
-                  className="text-2xl select-none text-gray-800 space-y-8 leading-relaxed"
+                  className="text-sm select-none text-gray-800 space-y-10 leading-[3]"
                 >
                   {renderWords()}
                 </div>
