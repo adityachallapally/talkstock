@@ -244,28 +244,29 @@ export function StockVideoUploader() {
   };
 
   const handleMouseDown = (e: React.MouseEvent, highlightId: string | null = null, type: string | null = null) => {
-    console.log('🖱️ Mouse Down:', {
-        highlightId,
-        type,
-        isDragging: isDragging,
-        target: {
-            wordIndex: (e.target as HTMLElement).getAttribute('data-word-index'),
-            className: (e.target as HTMLElement).className
-        }
+    const wordIndex = (e.target as HTMLElement).getAttribute('data-word-index');
+    console.log('🎯 Selection Start:', {
+      wordIndex,
+      isHandle: !!highlightId,
+      handleType: type,
+      words: wordIndex ? words[parseInt(wordIndex)].word : null
     });
     
     e.preventDefault();
     if (highlightId) {
-        setActiveHighlight(highlightId);
-        setDragType(type);
-        setIsDragging(true);
+      setActiveHighlight(highlightId);
+      setDragType(type);
+      setIsDragging(true);
     } else {
-        const wordIndex = getWordIndexAtPosition(e.clientX, e.clientY);
-        if (wordIndex !== null) {
-            setSelectionStart(wordIndex);
-            setSelectionEnd(wordIndex);
-            setIsDragging(true);
-        }
+      const wordIndex = getWordIndexAtPosition(e.clientX, e.clientY);
+      if (wordIndex !== null) {
+        setSelectionStart(wordIndex);
+        setSelectionEnd(wordIndex);
+        setIsDragging(true);
+        setSelectedTranscriptSegment(null);
+        setPendingTranscriptSegment(null);
+        setHasExistingOverlay(false);
+      }
     }
   };
 
@@ -275,39 +276,98 @@ export function StockVideoUploader() {
     const wordIndex = getWordIndexAtPosition(e.clientX, e.clientY);
     if (wordIndex === null) return;
 
+    // Only log when the wordIndex changes
+    if (wordIndex !== selectionEnd) {
+      console.log('📏 Selection Update:', {
+        start: selectionStart !== null ? words[selectionStart].word : null,
+        end: words[wordIndex].word,
+        startIndex: selectionStart,
+        endIndex: wordIndex,
+        isDragging
+      });
+    }
+
     if (activeHighlight) {
-        const highlight = highlights.find(h => h.id === activeHighlight);
-        if (highlight) {
-            if (dragType === 'start') {
-                // When dragging start handle, ensure we don't go past the end
-                if (wordIndex <= highlight.end) {
-                    updateHighlightDuration(activeHighlight, wordIndex, highlight.end, 'start');
-                }
-            } else if (dragType === 'end') {
-                // When dragging end handle, ensure we don't go before the start
-                if (wordIndex >= highlight.start) {
-                    updateHighlightDuration(activeHighlight, highlight.start, wordIndex, 'end');
-                }
-            }
+      const highlight = highlights.find(h => h.id === activeHighlight);
+      if (highlight) {
+        if (dragType === 'start') {
+          if (wordIndex <= highlight.end) {
+            updateHighlightDuration(activeHighlight, wordIndex, highlight.end, 'start');
+          }
+        } else if (dragType === 'end') {
+          if (wordIndex >= highlight.start) {
+            updateHighlightDuration(activeHighlight, highlight.start, wordIndex, 'end');
+          }
         }
-    } else {
-        setSelectionEnd(wordIndex);
+      }
+    } else if (selectionStart !== null) {
+      const prevEnd = selectionEnd; // Store previous end for debugging
+      setSelectionEnd(wordIndex);
+      
+      console.log('🎯 Setting new selection end:', {
+        from: prevEnd,
+        to: wordIndex,
+        isDragging
+      });
+      
+      const start = Math.min(selectionStart, wordIndex);
+      const end = Math.max(selectionStart, wordIndex);
+      const selectedWords = words.slice(start, end + 1);
+      
+      if (selectedWords.length > 0) {
+        const segment = {
+          text: selectedWords.map(w => w.word).join(' '),
+          startMs: transcript[selectedWords[0].segmentIndex].startMs,
+          endMs: transcript[selectedWords[selectedWords.length - 1].segmentIndex].endMs
+        };
+        setPendingTranscriptSegment(segment);
+      }
     }
   };
 
   const handleMouseUp = () => {
-    // Log only when there's a meaningful selection
-    if (isDragging && !activeHighlight && selectionStart !== null && selectionEnd !== null) {
-      const startWord = words[selectionStart];
-      const endWord = words[selectionEnd];
-      console.log('=== Selection Complete ===', {
-        selection: {
-          start: { index: selectionStart, word: startWord?.word },
-          end: { index: selectionEnd, word: endWord?.word }
+    // Capture values before state updates
+    const finalStart = selectionStart;
+    const finalEnd = selectionEnd;
+    
+    console.log('🔍 Final Selection State:', {
+      isDragging,
+      selectionRange: finalStart !== null && finalEnd !== null ? {
+        start: {
+          index: finalStart,
+          word: words[finalStart].word
         },
-        segment: startWord && endWord ? transcript[startWord.segmentIndex] : null
-      });
+        end: {
+          index: finalEnd,
+          word: words[finalEnd].word
+        },
+        text: words.slice(
+          Math.min(finalStart, finalEnd),
+          Math.max(finalStart, finalEnd) + 1
+        ).map(w => w.word).join(' ')
+      } : null,
+      isExistingHighlight: !!activeHighlight
+    });
+
+    if (isDragging && !activeHighlight && finalStart !== null && finalEnd !== null) {
+      const start = Math.min(finalStart, finalEnd);
+      const end = Math.max(finalStart, finalEnd);
+      const selectedWords = words.slice(start, end + 1);
+      
+      if (selectedWords.length > 0) {
+        const segment = {
+          text: selectedWords.map(w => w.word).join(' '),
+          startMs: transcript[selectedWords[0].segmentIndex].startMs,
+          endMs: transcript[selectedWords[selectedWords.length - 1].segmentIndex].endMs
+        };
+
+        setSelectedTranscriptSegment(segment);
+        setPendingTranscriptSegment(segment);
+        setHasExistingOverlay(false);
+      }
     }
+
+    // Clear states after processing
     setIsDragging(false);
     setActiveHighlight(null);
     setDragType(null);
@@ -322,7 +382,17 @@ export function StockVideoUploader() {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, activeHighlight, dragType]);
+  }, [isDragging, activeHighlight, dragType, selectionStart, selectionEnd, words]);
+
+  // Add debug effect to track selection state changes
+  useEffect(() => {
+    console.log('🔄 Selection State Updated:', {
+      selectionStart,
+      selectionEnd,
+      isDragging,
+      activeHighlight
+    });
+  }, [selectionStart, selectionEnd, isDragging, activeHighlight]);
 
   // Add handleHighlightClick function after handleMouseUp
   const handleHighlightClick = (e: React.MouseEvent, highlight: { id: string; start: number; end: number; overlay: OverlayConfig }) => {
@@ -367,9 +437,16 @@ export function StockVideoUploader() {
       });
       
       const isHovered = highlight && hoveredHighlight === highlight.id;
-      const isSelected = pendingTranscriptSegment && 
+      
+      // Check if word is in current selection range
+      const isInSelection = selectionStart !== null && selectionEnd !== null && (
+        (index >= Math.min(selectionStart, selectionEnd) && 
+         index <= Math.max(selectionStart, selectionEnd))
+      );
+      
+      const isSelected = (pendingTranscriptSegment && 
         wordObj.timeMs >= pendingTranscriptSegment.startMs && 
-        wordObj.timeMs <= pendingTranscriptSegment.endMs;
+        wordObj.timeMs <= pendingTranscriptSegment.endMs) || isInSelection;
       
       const isHighlightStart = highlight && index === highlight.start;
       const isHighlightEnd = highlight && index === highlight.end;
@@ -384,6 +461,7 @@ export function StockVideoUploader() {
         'transition-colors duration-150',
         'cursor-pointer',
         'text-2xl',
+        'select-none', // Prevent text selection
       ].filter(Boolean).join(' ');
       
       return (
@@ -391,7 +469,20 @@ export function StockVideoUploader() {
           key={index}
           data-word-index={index}
           className={wrapperClasses}
-          onClick={(e) => handleSegmentClick(e, index)}
+          onMouseDown={(e) => {
+            // If clicking on a highlight, handle it differently
+            if (highlight) {
+              e.preventDefault();
+              handleHighlightClick(e, {
+                id: highlight.id,
+                start: highlight.start,
+                end: highlight.end,
+                overlay: highlight.overlay
+              });
+            } else {
+              handleMouseDown(e);
+            }
+          }}
           onMouseEnter={() => {
             if (highlight) {
               setHoveredHighlight(highlight.id);
