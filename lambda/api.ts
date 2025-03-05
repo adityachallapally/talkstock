@@ -28,12 +28,20 @@ const makeRequest = async <Res>(
       "content-type": "application/json",
     },
   });
-  const json = (await result.json()) as ApiResponse<Res>;
-  if (json.type === "error") {
-    throw new Error(json.message);
+
+  if (!result.ok) {
+    throw new Error(`Request failed with status ${result.status}`);
   }
 
-  return json.data;
+  const json = await result.json();
+  if (json.type === "error") {
+    throw new Error(json.message);
+  } else if (json.type === "success") {
+    return json.data;
+  }
+
+  // For backward compatibility, if response is not wrapped
+  return json as Res;
 };
 
 export const renderVideo = async ({

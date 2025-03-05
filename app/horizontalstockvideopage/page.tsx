@@ -6,7 +6,7 @@ import {
   HorizontalStockVideo,
   calculateStockVideoMetadata,
   stockVideoSchema,
-} from '@/components/remotion/HorizontalStockVideo';
+} from '@/remotion/HorizontalStockVideo';
 
 const HorizontalStockVideoPage: React.FC = () => {
   const [duration, setDuration] = useState<number>(0);

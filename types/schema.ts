@@ -4,6 +4,10 @@ import { CompositionProps } from "./constants";
 export const RenderRequest = z.object({
   id: z.string(),
   inputProps: CompositionProps,
+  fps: z.number().optional(),
+  durationInFrames: z.number(),
+  width: z.number().optional(),
+  height: z.number().optional(),
 });
 
 export const ProgressRequest = z.object({

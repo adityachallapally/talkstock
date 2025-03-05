@@ -5,17 +5,19 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Player } from '@remotion/player';
-import { CaptionedVideo } from '@/components/remotion/CaptionedVideo';
+import { AbsoluteFill, OffthreadVideo } from 'remotion';
+import { CaptionedVideo } from '@/remotion/CaptionedVideo';
 import { OverlayConfig, TemplateType } from '@/types/constants';
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { parseMedia } from '@remotion/media-parser';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Trash2, HelpCircle, RotateCcw } from 'lucide-react';
+import { Trash2, HelpCircle, RotateCcw, Upload, Download, RefreshCw } from 'lucide-react';
 
 // Add type declaration for webkitAudioContext
 declare global {
@@ -38,25 +40,30 @@ interface TranscriptLine {
   endMs: number;
 }
 
-// New hook for interactive highlight logic (revised to use transcript timing)
+interface RenderProgress {
+  type: 'progress' | 'done' | 'error';
+  progress?: number;
+  url?: string;
+  message?: string;
+}
+
+// Modify the useHighlights hook to use indices
 const useHighlights = (transcript: TranscriptLine[], videoVariants: VideoVariant[], setVideoVariants: (v: VideoVariant[]) => void) => {
-  // Build an array of word objects with timing info
-  const wordData = transcript.reduce((acc: { word: string; timeMs: number; segmentIndex: number }[], line, segmentIndex) => {
-    const lineWords = line.text.split(/(\s+)/).filter(w => w.length > 0);
-    const wordCount = lineWords.length;
-    const duration = line.endMs - line.startMs;
-    const durationPerWord = wordCount > 0 ? duration / wordCount : 0;
-    lineWords.forEach((word, i) => {
+  // Build an array of word objects with index info
+  const words = transcript.reduce((acc: { index: number; word: string; transcriptIndex: number; startMs: number; endMs: number }[], line, transcriptIndex) => {
+    const lineWords = line.text.split(/\s+/).filter(w => w.trim().length > 0);
+    lineWords.forEach((word) => {
       acc.push({
+        index: acc.length,
         word,
-        timeMs: line.startMs + i * durationPerWord,
-        segmentIndex
+        transcriptIndex,
+        startMs: line.startMs,
+        endMs: line.endMs
       });
     });
     return acc;
   }, []);
 
-  const words = wordData;
   const [isDragging, setIsDragging] = useState(false);
   const [activeHighlight, setActiveHighlight] = useState<string | null>(null);
   const [dragType, setDragType] = useState<string | null>(null);
@@ -74,15 +81,9 @@ const useHighlights = (transcript: TranscriptLine[], videoVariants: VideoVariant
         const overlayStartMs = (overlay.startFrame / 30) * 1000;
         const overlayEndMs = ((overlay.startFrame + overlay.duration) / 30) * 1000;
 
-        // Find the first word that starts at or after the overlay start time
-        const startIndex = words.findIndex(wordObj => wordObj.timeMs >= overlayStartMs);
-        
-        // Find the last word that ends before or at the overlay end time
-        const endIndex = words.findLastIndex(wordObj => {
-          const wordEndMs = transcript[wordObj.segmentIndex].endMs;
-          return wordEndMs <= overlayEndMs;
-        });
-
+        // Find words that fall within this overlay's time range
+        const startIndex = words.findIndex(w => w.startMs >= overlayStartMs);
+        const endIndex = words.findLastIndex(w => w.endMs <= overlayEndMs);
         
         if (startIndex !== -1 && endIndex !== -1 && startIndex <= endIndex) {
           highlights.push({
@@ -103,99 +104,60 @@ const useHighlights = (transcript: TranscriptLine[], videoVariants: VideoVariant
     const variant = videoVariants[0];
     
     const currentOverlay = variant.overlays.find(o => 
-        o.type === TemplateType.STOCK_VIDEO && o.startFrame.toString() === id
+      o.type === TemplateType.STOCK_VIDEO && o.startFrame.toString() === id
     );
     
     if (!currentOverlay) return;
 
-    console.log('🎯 Updating Highlight:', {
-      id,
-      type,
-      newStart,
-      newEnd,
-      currentOverlay,
-      wordAtStart: words[newStart],
-      wordAtEnd: words[newEnd]
-    });
-
-    let newHighlightId = id;
     const updatedOverlays = variant.overlays.map(overlay => {
-        if (overlay.type === TemplateType.STOCK_VIDEO && overlay.startFrame.toString() === id) {
-            if (type === 'start') {
-                // Only update start frame, keep original end frame
-                const newStartFrame = Math.round((words[newStart].timeMs / 1000) * 30);
-                const currentEndFrame = overlay.startFrame + overlay.duration;
-                
-                console.log('📏 Left Handle Update:', {
-                    newStartFrame,
-                    currentEndFrame,
-                    wordTiming: words[newStart].timeMs,
-                    resultingDuration: currentEndFrame - newStartFrame
-                });
-
-                // Store the new ID for the highlight
-                newHighlightId = newStartFrame.toString();
-
-                return {
-                    ...overlay,
-                    startFrame: newStartFrame,
-                    duration: currentEndFrame - newStartFrame
-                };
-            } else {
-                // Only update duration based on new end position, keep original start frame
-                const newEndFrame = Math.round((words[newEnd].timeMs / 1000) * 30);
-                return {
-                    ...overlay,
-                    startFrame: overlay.startFrame,
-                    duration: newEndFrame - overlay.startFrame
-                };
-            }
+      if (overlay.type === TemplateType.STOCK_VIDEO && overlay.startFrame.toString() === id) {
+        if (type === 'start') {
+          // Make left handle calculation symmetrical with right handle
+          const newStartFrame = Math.round((words[Math.max(0, newStart)].startMs / 1000) * 30);
+          const currentEndFrame = overlay.startFrame + overlay.duration;
+          const newDuration = currentEndFrame - newStartFrame;
+          
+          return {
+            ...overlay,
+            startFrame: newStartFrame,
+            duration: Math.max(30, newDuration) // Ensure minimum duration
+          };
+        } else {
+          // Right handle calculation remains the same
+          const newEndFrame = Math.round((words[newEnd].endMs / 1000) * 30);
+          const newDuration = newEndFrame - overlay.startFrame;
+          
+          return {
+            ...overlay,
+            duration: Math.max(30, newDuration) // Ensure minimum duration
+          };
         }
-        return overlay;
+      }
+      return overlay;
     });
-    
-    console.log('✨ Overlay Update Result:', {
-        originalOverlaysCount: variant.overlays.length,
-        updatedOverlaysCount: updatedOverlays.length,
-        updatedOverlay: updatedOverlays.find(o => o.type === TemplateType.STOCK_VIDEO && o.startFrame.toString() === newHighlightId),
-        oldId: id,
-        newId: newHighlightId
-    });
-
-    // Update the active highlight ID if it changed
-    if (newHighlightId !== id) {
-        console.log('🔄 Updating Active Highlight ID:', {
-            from: id,
-            to: newHighlightId
-        });
-        setActiveHighlight(newHighlightId);
-    }
 
     setVideoVariants([{ ...variant, overlays: updatedOverlays }]);
   };
 
   const addHighlight = (startIndex: number, endIndex: number, videoSrc: string) => {
-    if (!videoVariants.length || Math.abs(startIndex - endIndex) < 2) return;
+    if (!videoVariants.length || Math.abs(startIndex - endIndex) < 1) return;
     
     const variant = videoVariants[0];
-    const startTime = words[startIndex]?.timeMs;
-    const endTime = words[endIndex]?.timeMs;
-    
-    if (startTime === undefined || endTime === undefined) return;
+    const startTime = words[startIndex].startMs;
+    const endTime = words[endIndex].endMs;
     
     const startFrame = Math.round((startTime / 1000) * 30);
     const duration = Math.round(((endTime - startTime) / 1000) * 30);
 
-    // Create new overlay
     const newOverlay: OverlayConfig = {
       startFrame,
-      duration: Math.max(duration, 30), // Ensure minimum duration of 1 second
+      duration: Math.max(duration, 30),
       type: TemplateType.STOCK_VIDEO,
       videoSrc,
       provider: 'Pexels'
     };
 
-    // Remove any overlapping overlays
+    // Remove overlapping overlays
     const nonOverlappingOverlays = variant.overlays.filter(overlay => {
       if (overlay.type !== TemplateType.STOCK_VIDEO) return true;
       const overlayEnd = overlay.startFrame + overlay.duration;
@@ -241,11 +203,16 @@ export function StockVideoUploader() {
   const [searchResults, setSearchResults] = useState<{ videoSrc: string }[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [hasExistingOverlay, setHasExistingOverlay] = useState(false);
+  const [showPricingModal, setShowPricingModal] = useState(false);
+  const [showInstructions, setShowInstructions] = useState(true);
+  const [isRendering, setIsRendering] = useState(false);
+  const [renderProgress, setRenderProgress] = useState<RenderProgress | null>(null);
   const { toast } = useToast();
   const [selectedVideo, setSelectedVideo] = useState<{ videoSrc: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showHelp, setShowHelp] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const progressIntervalRef = useRef<NodeJS.Timeout>();
 
   // Compute transcript text
   // const transcriptText = transcript.map(line => line.text).join(' ');
@@ -315,32 +282,10 @@ export function StockVideoUploader() {
     const wordIndex = getWordIndexAtPosition(e.clientX, e.clientY);
     if (wordIndex === null) return;
 
-    // Only log when wordIndex changes to avoid console spam
-    if (wordIndex !== selectionEnd) {
-      console.log('➡️ Handle MouseMove:', {
-        activeHighlight,
-        dragType,
-        wordIndex,
-        currentSelection: {
-          start: selectionStart,
-          end: selectionEnd
-        },
-        highlightInfo: activeHighlight ? highlights.find(h => h.id === activeHighlight) : null
-      });
-    }
-
     if (activeHighlight) {
-      // Find the highlight and cache it to prevent losing reference
       const highlight = highlights.find(h => h.id === activeHighlight);
-      console.log('🔍 Active Highlight State:', {
-        foundHighlight: !!highlight,
-        highlightDetails: highlight,
-        activeHighlightId: activeHighlight,
-        availableHighlights: highlights.map(h => h.id)
-      });
-
       if (!highlight) {
-        // If we lost the highlight reference, try to recover it from the overlays
+        // Recovery logic for lost highlight reference
         const variant = videoVariants[0];
         if (variant) {
           const overlayId = activeHighlight;
@@ -350,49 +295,41 @@ export function StockVideoUploader() {
           );
           
           if (overlay) {
-            // Recalculate the highlight bounds
             const startMs = (overlay.startFrame / 30) * 1000;
             const endMs = ((overlay.startFrame + overlay.duration) / 30) * 1000;
             
             // Find word indices that match these times
-            const startIndex = words.findIndex(w => w.timeMs >= startMs);
-            const endIndex = words.findLastIndex(w => w.timeMs <= endMs);
-            
-            console.log('🔄 Recovered Highlight:', {
-              startIndex,
-              endIndex,
-              startMs,
-              endMs,
-              overlay
-            });
+            const startIndex = words.findIndex(w => w.startMs >= startMs);
+            const endIndex = words.findLastIndex(w => w.endMs <= endMs);
 
             if (startIndex !== -1 && endIndex !== -1) {
-              // Use recovered indices
-              if (dragType === 'start' && wordIndex <= endIndex) {
-                updateHighlightDuration(activeHighlight, wordIndex, endIndex, 'start');
-              } else if (dragType === 'end' && wordIndex >= startIndex) {
-                updateHighlightDuration(activeHighlight, startIndex, wordIndex, 'end');
+              if (dragType === 'start') {
+                // Add buffer for left handle and ensure bounds
+                const adjustedWordIndex = Math.max(0, wordIndex);
+                if (adjustedWordIndex < endIndex) {
+                  updateHighlightDuration(activeHighlight, adjustedWordIndex, endIndex, 'start');
+                }
+              } else if (dragType === 'end') {
+                // Right handle remains the same
+                if (wordIndex >= startIndex) {
+                  updateHighlightDuration(activeHighlight, startIndex, wordIndex, 'end');
+                }
               }
-              return;
             }
+            return;
           }
         }
-        console.warn('❌ Could not recover highlight reference');
         return;
       }
 
       if (dragType === 'start') {
-        console.log('⬅️ Left Handle Move:', {
-          proposedStartIndex: wordIndex,
-          currentEndIndex: highlight.end,
-          wouldBeValid: wordIndex <= highlight.end,
-          currentHighlight: highlight
-        });
-        
-        if (wordIndex <= highlight.end) {
-          updateHighlightDuration(activeHighlight, wordIndex, highlight.end, 'start');
+        // Add buffer for left handle and ensure bounds
+        const adjustedWordIndex = Math.max(0, wordIndex);
+        if (adjustedWordIndex < highlight.end) {
+          updateHighlightDuration(activeHighlight, adjustedWordIndex, highlight.end, 'start');
         }
       } else if (dragType === 'end') {
+        // Right handle remains the same
         if (wordIndex >= highlight.start) {
           updateHighlightDuration(activeHighlight, highlight.start, wordIndex, 'end');
         }
@@ -407,8 +344,8 @@ export function StockVideoUploader() {
       if (selectedWords.length > 0) {
         const segment = {
           text: selectedWords.map(w => w.word).join(' '),
-          startMs: transcript[selectedWords[0].segmentIndex].startMs,
-          endMs: transcript[selectedWords[selectedWords.length - 1].segmentIndex].endMs
+          startMs: transcript[selectedWords[0].transcriptIndex].startMs,
+          endMs: transcript[selectedWords[selectedWords.length - 1].transcriptIndex].endMs
         };
         setPendingTranscriptSegment(segment);
       }
@@ -425,8 +362,8 @@ export function StockVideoUploader() {
         if (selectedWords.length > 0) {
             const segment = {
                 text: selectedWords.map(w => w.word).join(' '),
-                startMs: transcript[selectedWords[0].segmentIndex].startMs,
-                endMs: transcript[selectedWords[selectedWords.length - 1].segmentIndex].endMs
+                startMs: transcript[selectedWords[0].transcriptIndex].startMs,
+                endMs: transcript[selectedWords[selectedWords.length - 1].transcriptIndex].endMs
             };
             
             console.log('🎯 Segment:', {
@@ -467,7 +404,7 @@ export function StockVideoUploader() {
     });
   }, [selectionStart, selectionEnd, isDragging, activeHighlight]);
 
-  // Add handleHighlightClick function after handleMouseUp
+  // Fix the handleHighlightClick function to use transcriptIndex and avoid redeclarations
   const handleHighlightClick = (e: React.MouseEvent, highlight: { id: string; start: number; end: number; overlay: OverlayConfig }) => {
     console.log('🔍 Highlight Click Debug:', {
       highlightRange: {
@@ -489,10 +426,13 @@ export function StockVideoUploader() {
     
     // Create a segment that spans the entire highlight
     const wordsInRange = words.slice(highlight.start, highlight.end + 1);
+    const firstWord = wordsInRange[0];
+    const lastWord = wordsInRange[wordsInRange.length - 1];
+    
     const segment = {
       text: wordsInRange.map(w => w.word).join(' '),
-      startMs: transcript[wordsInRange[0].segmentIndex].startMs,
-      endMs: transcript[wordsInRange[wordsInRange.length - 1].segmentIndex].endMs
+      startMs: transcript[firstWord.transcriptIndex].startMs,
+      endMs: transcript[lastWord.transcriptIndex].endMs
     };
     
     console.log('🔍 Created Segment:', segment);
@@ -502,16 +442,14 @@ export function StockVideoUploader() {
     setHasExistingOverlay(true);
   };
 
-  // Update the renderWords function
+  // Update the renderWords function for continuous highlighting
   const renderWords = () => {
     let paragraphs: JSX.Element[][] = [[]];
     let currentParagraph = 0;
 
     words.forEach((wordObj, index) => {
-      // Find highlight data for this particular word index
       const highlight = highlights.find(h => index >= h.start && index <= h.end);
-
-      // Check states that could cause highlighting
+      
       const isInSelection =
         selectionStart !== null &&
         selectionEnd !== null &&
@@ -520,36 +458,46 @@ export function StockVideoUploader() {
 
       const isSelected = 
         (pendingTranscriptSegment &&
-         wordObj.timeMs >= pendingTranscriptSegment.startMs && 
-         wordObj.timeMs <= pendingTranscriptSegment.endMs) ||
+         wordObj.startMs >= pendingTranscriptSegment.startMs && 
+         wordObj.endMs <= pendingTranscriptSegment.endMs) ||
         isInSelection;
 
       const isHovered = highlight && hoveredHighlight === highlight.id;
       const isHighlightStart = highlight && index === highlight.start;
       const isHighlightEnd = highlight && index === highlight.end;
-
-      const wrapperClasses = [
-        'relative',
-        'inline',
-        'group',
-        highlight || isSelected ? 'bg-amber-200/75' : '',
-        isHovered ? 'bg-amber-200/90' : '',
-        isHighlightStart ? 'rounded-l-sm pl-3' : '',
-        isHighlightEnd ? 'rounded-r-sm pr-3' : '',
-        'transition-colors duration-150',
-        'cursor-pointer',
-        'text-xl',
-        'select-none', // Prevent manual text selection
-      ].filter(Boolean).join(' ');
+      const isHighlightMiddle = highlight && !isHighlightStart && !isHighlightEnd;
 
       // Check if a new paragraph should start
       const startsWithCapital = /^[A-Z]/.test(wordObj.word);
       const isFirstWord = index === 0;
       const prevWordEndsPunctuation = index > 0 && /[.!?]$/.test(words[index - 1].word);
+      
       if (startsWithCapital && (isFirstWord || prevWordEndsPunctuation)) {
         currentParagraph++;
         paragraphs[currentParagraph] = [];
       }
+
+      const wrapperClasses = [
+        'relative',
+        'inline-flex',
+        'items-center',
+        'mx-1.5',
+        'px-[3px]',
+        'group',
+        highlight || isSelected ? 'bg-amber-200/75' : '',
+        isHovered ? 'bg-amber-200/90' : '',
+        isHighlightStart ? 'rounded-l-sm' : '',
+        isHighlightEnd ? 'rounded-r-sm' : '',
+        isHighlightMiddle ? '-mx-[1px]' : '',
+        'transition-colors duration-150',
+        'cursor-pointer',
+        'text-xl',
+        'select-none',
+        'leading-loose',
+        'my-1',
+        (highlight || isSelected) && !isHighlightStart ? '-ml-[1px]' : '',
+        (highlight || isSelected) && !isHighlightEnd ? '-mr-[1px]' : '',
+      ].filter(Boolean).join(' ');
 
       const wordElement = (
         <span
@@ -558,13 +506,7 @@ export function StockVideoUploader() {
           className={wrapperClasses}
           onMouseDown={(e) => {
             if (highlight) {
-              e.preventDefault();
-              handleHighlightClick(e, {
-                id: highlight.id,
-                start: highlight.start,
-                end: highlight.end,
-                overlay: highlight.overlay
-              });
+              handleHighlightClick(e, highlight);
             } else {
               handleMouseDown(e);
             }
@@ -578,25 +520,18 @@ export function StockVideoUploader() {
             setHoveredHighlight(null);
           }}
         >
-          {highlight && isHighlightStart && (
-            <span
-              className="absolute left-0.5 top-1/2 -translate-y-1/2 w-1 h-4 cursor-ew-resize bg-amber-400 hover:bg-amber-500 transition-colors rounded-full shadow-sm hover:shadow-md opacity-0 group-hover:opacity-100"
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                handleMouseDown(e, highlight.id, 'start');
-              }}
-            />
-          )}
+          <span className="relative">
+            {wordObj.word}
+          </span>
           {highlight && isHighlightEnd && (
             <span
-              className="absolute right-0.5 top-1/2 -translate-y-1/2 w-1 h-4 cursor-ew-resize bg-amber-400 hover:bg-amber-500 transition-colors rounded-full shadow-sm hover:shadow-md opacity-0 group-hover:opacity-100"
+              className="absolute right-0 top-1/2 -translate-y-1/2 w-1.5 h-6 cursor-ew-resize bg-amber-400 hover:bg-amber-500 transition-colors rounded-full shadow-sm hover:shadow-md -mr-1"
               onMouseDown={(e) => {
                 e.stopPropagation();
                 handleMouseDown(e, highlight.id, 'end');
               }}
             />
           )}
-          {wordObj.word + " "}
         </span>
       );
 
@@ -604,7 +539,7 @@ export function StockVideoUploader() {
     });
 
     return paragraphs.map((paragraph, index) => (
-      <p key={index} className="mb-4">
+      <p key={index} className="mb-8 leading-[3] flex flex-wrap">
         {paragraph}
       </p>
     ));
@@ -635,8 +570,8 @@ export function StockVideoUploader() {
         const selectedWords = words.slice(startIndex, endIndex + 1);
         const segment = {
           text: selectedWords.map(w => w.word).join(' '),
-          startMs: transcript[selectedWords[0].segmentIndex].startMs,
-          endMs: transcript[selectedWords[selectedWords.length - 1].segmentIndex].endMs
+          startMs: transcript[selectedWords[0].transcriptIndex].startMs,
+          endMs: transcript[selectedWords[selectedWords.length - 1].transcriptIndex].endMs
         };
 
         setSelectedTranscriptSegment(segment);
@@ -834,13 +769,64 @@ export function StockVideoUploader() {
       const demoVideoUrl = 'https://hx7mp5wayo6ybdwl.public.blob.vercel-storage.com/IMG_6062-ustELCsT8kuxTiuEmUhR0NTEefvx6P.MP4';
       const demoTranscriptUrl = 'https://hx7mp5wayo6ybdwl.public.blob.vercel-storage.com/transcript-YxnHCXJcmH4JJqN5LH4M7r79CprrIa.json';
 
+      console.log('🚀 Starting demo load with:', { demoVideoUrl, demoTranscriptUrl });
+
+      // Use static dimensions for portrait mode videos
+      const width = 1080;
+      const height = 1920;
+      
+      // Test video metadata retrieval explicitly with detailed logging
+      console.log('📏 Attempting to get video metadata...');
+      
+      // Initialize slowDurationInSeconds with a default value
+      let slowDurationInSeconds = 30; // Default 30 seconds
+      
+      try {
+        console.log('📏 Calling parseMedia with URL:', demoVideoUrl);
+        const metadata = await parseMedia({
+          src: demoVideoUrl,
+          fields: {
+            slowDurationInSeconds: true
+          },
+          acknowledgeRemotionLicense: true
+        });
+        console.log('📏 Video metadata retrieved successfully:', {
+          slowDurationInSeconds: metadata.slowDurationInSeconds,
+          fullMetadata: metadata
+        });
+        
+        slowDurationInSeconds = metadata.slowDurationInSeconds;
+      } catch (metadataError) {
+        console.error('❌ Failed to get video metadata:', {
+          error: metadataError,
+          message: metadataError.message,
+          stack: metadataError.stack
+        });
+        console.warn('⚠️ Using fallback duration:', slowDurationInSeconds);
+      }
+
+      // Calculate frames using the metadata (either retrieved or fallback)
+      const durationInFrames = Math.round(slowDurationInSeconds * 30);
+      console.log('📏 Using duration in frames:', durationInFrames);
+
+      // Check transcript URL accessibility
+      console.log('📝 Checking transcript URL accessibility...');
+      const transcriptResponse = await fetch(demoTranscriptUrl);
+      
+      if (!transcriptResponse.ok) {
+        throw new Error(`Transcript URL is not accessible: ${transcriptResponse.status} ${transcriptResponse.statusText}`);
+      }
+
+      const transcriptData = await transcriptResponse.json();
+      console.log('📝 Loaded transcript data:', transcriptData);
+
       // Mock overlays based on the logs
-      const mockOverlays: OverlayConfig[] = [
+      const mockOverlays = [
         {
           startFrame: Math.round((8540 / 1000) * 30),
           duration: Math.round((2000 / 1000) * 30),
           type: TemplateType.STOCK_VIDEO,
-          videoSrc: 'https://videos.pexels.com/video-files/5717293/5717293-uhd_2160_3840_25fps.mp4',
+          videoSrc: 'https://videos.pexels.com/video-files/5532765/5532765-sd_506_960_25fps.mp4',
           title: '',
           provider: 'Pexels'
         },
@@ -848,7 +834,7 @@ export function StockVideoUploader() {
           startFrame: Math.round((11800 / 1000) * 30),
           duration: Math.round((2000 / 1000) * 30),
           type: TemplateType.STOCK_VIDEO,
-          videoSrc: 'https://videos.pexels.com/video-files/9364184/9364184-sd_240_426_25fps.mp4',
+          videoSrc: 'https://videos.pexels.com/video-files/5532765/5532765-sd_506_960_25fps.mp4',
           title: '',
           provider: 'Pexels'
         },
@@ -856,39 +842,7 @@ export function StockVideoUploader() {
           startFrame: Math.round((14560 / 1000) * 30),
           duration: Math.round((2000 / 1000) * 30),
           type: TemplateType.STOCK_VIDEO,
-          videoSrc: 'https://videos.pexels.com/video-files/7822022/7822022-sd_360_640_30fps.mp4',
-          title: '',
-          provider: 'Pexels'
-        },
-        {
-          startFrame: Math.round((22360 / 1000) * 30),
-          duration: Math.round((2000 / 1000) * 30),
-          type: TemplateType.STOCK_VIDEO,
-          videoSrc: 'https://videos.pexels.com/video-files/5495890/5495890-sd_540_960_30fps.mp4',
-          title: '',
-          provider: 'Pexels'
-        },
-        {
-          startFrame: Math.round((25320 / 1000) * 30),
-          duration: Math.round((2000 / 1000) * 30),
-          type: TemplateType.STOCK_VIDEO,
-          videoSrc: 'https://videos.pexels.com/video-files/7660184/7660184-uhd_1440_2560_25fps.mp4',
-          title: '',
-          provider: 'Pexels'
-        },
-        {
-          startFrame: Math.round((34880 / 1000) * 30),
-          duration: Math.round((2000 / 1000) * 30),
-          type: TemplateType.STOCK_VIDEO,
-          videoSrc: 'https://videos.pexels.com/video-files/5756114/5756114-uhd_2160_3840_24fps.mp4',
-          title: '',
-          provider: 'Pexels'
-        },
-        {
-          startFrame: Math.round((38260 / 1000) * 30),
-          duration: Math.round((2000 / 1000) * 30),
-          type: TemplateType.STOCK_VIDEO,
-          videoSrc: 'https://videos.pexels.com/video-files/8165696/8165696-uhd_2160_4096_25fps.mp4',
+          videoSrc: 'https://videos.pexels.com/video-files/5532765/5532765-sd_506_960_25fps.mp4',
           title: '',
           provider: 'Pexels'
         }
@@ -898,16 +852,20 @@ export function StockVideoUploader() {
       const demoVariant = {
         src: demoVideoUrl,
         overlays: mockOverlays,
-        durationInFrames: Math.round((41420 / 1000) * 30), // Based on the last caption timestamp from logs
+        durationInFrames,
+        width,
+        height,
         transcriptionUrl: demoTranscriptUrl,
         provider: 'Pexels'
       };
 
+      console.log('✨ Setting video variant with metadata:', {
+        durationInFrames,
+        width,
+        height,
+        durationInSeconds: slowDurationInSeconds
+      });
       setVideoVariants([demoVariant]);
-
-      // Fetch and set transcript
-      const transcriptResponse = await fetch(demoTranscriptUrl);
-      const transcriptData = await transcriptResponse.json();
       setTranscript(transcriptData.transcription);
       
       toast({
@@ -916,10 +874,17 @@ export function StockVideoUploader() {
       });
 
     } catch (error) {
-      console.error('Demo loading error:', error);
+      console.error('❌ Demo loading error:', error);
+      // Log detailed error information
+      console.error('Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+      });
+      
       toast({
         title: "Error",
-        description: "Failed to load demo content. Please try again.",
+        description: `Failed to load demo content: ${error.message}`,
         variant: "destructive",
       });
     } finally {
@@ -1042,6 +1007,7 @@ export function StockVideoUploader() {
     return groups;
   };
 
+  // Fix the handleSegmentClick function to use transcriptIndex
   const handleSegmentClick = (event: React.MouseEvent, wordIndex: number) => {
     console.log('🎯 handleSegmentClick - Initial:', {
       wordIndex,
@@ -1071,28 +1037,14 @@ export function StockVideoUploader() {
       
       // If clicking an existing highlight, use its exact range
       const highlightWords = words.slice(existingHighlight.start, existingHighlight.end + 1);
-      
-      // Find the exact transcript segments that contain our start and end words
-      const startWord = highlightWords[0];
-      const endWord = highlightWords[highlightWords.length - 1];
-      
-      const startSegment = transcript[startWord.segmentIndex];
-      const endSegment = transcript[endWord.segmentIndex];
+      const firstHighlightWord = highlightWords[0];
+      const lastHighlightWord = highlightWords[highlightWords.length - 1];
       
       const segment = {
         text: highlightWords.map(w => w.word).join(' '),
-        startMs: startSegment.startMs,
-        endMs: endSegment.endMs
+        startMs: transcript[firstHighlightWord.transcriptIndex].startMs,
+        endMs: transcript[lastHighlightWord.transcriptIndex].endMs
       };
-
-      console.log('  Created segment from highlight with exact boundaries:', {
-        segment,
-        highlightWords: highlightWords.map(w => w.word),
-        startWord,
-        endWord,
-        startSegment,
-        endSegment
-      });
 
       setSelectedTranscriptSegment(segment);
       setPendingTranscriptSegment(segment);
@@ -1101,19 +1053,19 @@ export function StockVideoUploader() {
     }
     
     // If not clicking a highlight, find the exact segment for the clicked word
-    const wordSegment = transcript[clickedWord.segmentIndex];
+    const transcriptSegment = transcript[clickedWord.transcriptIndex];
     
-    if (wordSegment) {
+    if (transcriptSegment) {
       console.log('  Found matching word segment:', {
-        wordSegment,
+        transcriptSegment,
         clickedWord
       });
       
       // Create a segment that only includes this word's timing
       const segment = {
         text: clickedWord.word,
-        startMs: wordSegment.startMs,
-        endMs: wordSegment.endMs
+        startMs: transcriptSegment.startMs,
+        endMs: transcriptSegment.endMs
       };
       
       setSelectedTranscriptSegment(segment);
@@ -1278,32 +1230,285 @@ export function StockVideoUploader() {
     });
   };
 
+  const handleRegenerateAll = async () => {
+    if (!videoVariants.length) return;
+    
+    try {
+      const variant = videoVariants[0];
+      // Show loading state
+      toast({
+        title: "Regenerating",
+        description: "Generating new B-roll suggestions...",
+      });
+
+      const response = await fetch('/api/stock-videos/regenerate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          videoSrc: variant.src,
+          transcriptionUrl: variant.transcriptionUrl,
+          durationInFrames: variant.durationInFrames,
+        }),
+      });
+
+      if (!response.ok) throw new Error('Regeneration failed');
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setVideoVariants([{
+          ...variant,
+          overlays: data.overlays
+        }]);
+        
+        toast({
+          title: "Success",
+          description: "B-roll suggestions have been regenerated!",
+        });
+      }
+    } catch (error) {
+      console.error('Regeneration error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to regenerate B-roll suggestions. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const checkRenderProgress = async (renderId: string, bucketName: string) => {
+    try {
+      const response = await fetch('/api/lambda/progress', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: renderId,
+          bucketName: bucketName,
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to fetch progress');
+      const progress: RenderProgress = await response.json();
+
+      setRenderProgress(progress);
+
+      if (progress.type === 'done') {
+        setIsRendering(false);
+        clearInterval(progressIntervalRef.current);
+        // Trigger download
+        if (progress.url) {
+          window.location.href = progress.url;
+        }
+        toast({
+          title: "Success",
+          description: "Video rendered successfully!",
+        });
+      } else if (progress.type === 'error') {
+        setIsRendering(false);
+        clearInterval(progressIntervalRef.current);
+        toast({
+          title: "Error",
+          description: progress.message || "Failed to render video",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error checking render progress:', error);
+      toast({
+        title: "Error",
+        description: "Failed to check render progress",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDownload = async () => {
+    if (!videoVariants.length) return;
+    
+    setIsRendering(true);
+    setRenderProgress({ type: 'progress', progress: 0 });
+
+    try {
+      const variant = videoVariants[0];
+      
+      // Use static dimensions for portrait mode videos
+      const width = 1080;
+      const height = 1920;
+      const fps = 30;
+      
+      // Calculate video metadata on client side
+      console.log("📏 Getting video metadata...");
+      let slowDurationInSeconds = variant.durationInFrames / fps; // Default fallback
+      
+      try {
+        console.log("📏 Parsing media for:", variant.src);
+        const metadata = await parseMedia({
+          src: variant.src,
+          fields: {
+            fps: true,
+            slowDurationInSeconds: true
+          },
+          acknowledgeRemotionLicense: true
+        });
+        
+        console.log("📏 Media metadata:", { 
+          fps: metadata.fps, 
+          slowDurationInSeconds: metadata.slowDurationInSeconds 
+        });
+        
+        // Use the retrieved metadata
+        slowDurationInSeconds = metadata.slowDurationInSeconds;
+      } catch (error) {
+        console.error("❌ Error getting video metadata:", error);
+        console.warn("⚠️ Using fallback duration:", slowDurationInSeconds);
+      }
+      
+      // Calculate duration in frames based on the video duration
+      const durationInFrames = Math.floor(slowDurationInSeconds * fps);
+      
+      console.log("📐 Final video settings:", {
+        slowDurationInSeconds,
+        fps,
+        durationInFrames,
+        width,
+        height,
+        timeInSeconds: durationInFrames / fps
+      });
+      
+      // Log the request payload
+      const payload = {
+        id: 'captioned-video',
+        inputProps: {
+          src: variant.src,
+          overlays: variant.overlays,
+          transcriptionUrl: variant.transcriptionUrl,
+          showCaptions,
+        },
+        fps,
+        durationInFrames,
+        width,
+        height,
+      };
+      console.log('🚀 Starting render request with payload:', JSON.stringify(payload, null, 2));
+
+      const response = await fetch('/api/lambda/render', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      // Log detailed response information
+      console.log('📡 Response status:', response.status);
+      console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
+      
+      const responseText = await response.text();
+      console.log('📡 Raw response:', responseText);
+
+      if (!response.ok) {
+        let errorMessage = `Failed to start render (${response.status})`;
+        try {
+          const errorData = JSON.parse(responseText);
+          errorMessage = errorData.message || errorMessage;
+        } catch (e) {
+          console.error('Failed to parse error response:', e);
+        }
+        throw new Error(errorMessage);
+      }
+
+      const data = JSON.parse(responseText);
+      console.log('✅ Render started successfully:', data);
+
+      // Start polling for progress
+      progressIntervalRef.current = setInterval(
+        () => checkRenderProgress(data.renderId, data.bucketName),
+        2000
+      );
+    } catch (error) {
+      console.error('❌ Error starting render:', error);
+      if (error instanceof Error) {
+        console.error('Error details:', {
+          name: error.name,
+          message: error.message,
+          stack: error.stack,
+        });
+      }
+      setIsRendering(false);
+      setRenderProgress(null);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to start video render",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="flex flex-col h-screen bg-white">
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-3 border-b">
         <div className="flex items-center gap-4">
           <button 
-            onClick={() => {/* Add back navigation logic */}}
+            onClick={() => {
+              if (window.confirm('Are you sure you want to go back? Any unsaved changes will be lost.')) {
+                // Add navigation logic here
+              }
+            }}
             className="text-gray-600 hover:text-gray-800 text-sm flex items-center gap-2"
           >
             <span>←</span>
-            <span>Back to Library</span>
+            <span>Back to Home</span>
           </button>
-          <h1 className="text-[15px] text-gray-800 font-normal">Stanford AI course research</h1>
+          <img src="craftclipslogov2.png" alt="CraftClips.ai" className="h-9" />
         </div>
         <div className="flex items-center gap-4">
-          <span className="text-gray-600 text-sm flex items-center gap-1">
-            <span className="text-green-600">✓</span> Saved
-          </span>
-          <Button variant="ghost" className="text-orange-500 hover:text-orange-600 px-4 py-2 h-9">Upgrade</Button>
-          <Button className="bg-[#4F46E5] hover:bg-[#4338CA] text-white px-4 py-2 h-9 flex items-center gap-2">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="stroke-current">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M7 10l5 5 5-5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M12 15V3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            Export
+          <Button 
+            variant="ghost" 
+            className="text-orange-500 hover:text-orange-600 px-4 py-2 h-9"
+            onClick={() => setShowPricingModal(true)}
+          >
+            Upgrade
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleRegenerateAll}
+            className="h-9 px-4 py-2 flex items-center gap-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Regenerate All B-Roll
+          </Button>
+          <Button 
+            variant="outline" 
+            className="px-4 py-2 h-9 flex items-center gap-2"
+            onClick={handleButtonClick}
+          >
+            <Upload className="w-4 h-4" />
+            Upload Another Video
+          </Button>
+          <Button 
+            className="bg-[#4F46E5] hover:bg-[#4338CA] text-white px-4 py-2 h-9 flex items-center gap-2"
+            onClick={handleDownload}
+            disabled={isRendering || !videoVariants.length}
+          >
+            {isRendering ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                {renderProgress?.type === 'progress' && renderProgress.progress 
+                  ? `${Math.round(renderProgress.progress * 100)}%` 
+                  : 'Rendering...'}
+              </>
+            ) : (
+              <>
+                <Download className="w-4 h-4" />
+                Download
+              </>
+            )}
           </Button>
         </div>
       </div>
@@ -1314,17 +1519,21 @@ export function StockVideoUploader() {
           <>
             {/* Transcript Section */}
             <div className="w-[40%] h-full border-r flex flex-col">
-              <div className="flex items-center gap-2 px-4 py-2 border-b bg-gray-50">
-                <button className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-md text-sm font-medium">
-                  Visuals
-                </button>
-                <button className="px-3 py-1.5 text-gray-600 hover:bg-gray-100 rounded-md text-sm font-medium">
-                  Subtitles
-                </button>
-                <button className="px-3 py-1.5 text-gray-600 hover:bg-gray-100 rounded-md text-sm font-medium">
-                  Settings
-                </button>
-              </div>
+              {/* Add instructional text */}
+              {showInstructions && (
+                <div className="p-4 bg-blue-50 text-blue-800 text-sm relative">
+                  <p>We've auto-populated B-rolls into your setup. If you like them, feel free to download. You can drag the right handle to extend how long you want the B-roll to run, or delete and add your own.</p>
+                  <button 
+                    onClick={() => setShowInstructions(false)}
+                    className="absolute top-2 right-2 text-blue-600 hover:text-blue-800"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18"/>
+                      <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                  </button>
+                </div>
+              )}
 
               {/* B-Roll Action Toolbar */}
               <div className="flex items-center gap-2 p-3 border-b">
@@ -1395,20 +1604,10 @@ export function StockVideoUploader() {
               </div>
 
               <div className="p-4 flex-1 overflow-y-auto">
-                <div className="mb-4">
-                  <h2 className="text-lg font-medium text-gray-900 mb-2">Highlight transcript to generate B-roll</h2>
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
-                    <span>Transcript</span>
-                    <button className="text-gray-400 hover:text-gray-600 flex items-center gap-1">
-                      <HelpCircle className="w-4 h-4" />
-                      Something wrong? Regenerate
-                    </button>
-                  </div>
-                </div>
                 <div
                   ref={containerRef}
                   id="transcript-container"
-                  className="text-sm select-none text-gray-800 space-y-10 leading-[3]"
+                  className="text-sm select-none text-gray-800 space-y-12"
                 >
                   {renderWords()}
                 </div>
@@ -1418,7 +1617,13 @@ export function StockVideoUploader() {
             {/* Video Section */}
             <div className="w-[60%] h-full flex flex-col bg-gray-50">
               <div className="text-right p-3 text-sm text-gray-600 border-b">
-                Basic Stock videos provided by <a href="#" className="text-gray-800">Pexels</a>. <a href="#" className="text-blue-600 hover:text-blue-700">Upgrade to iStock</a>
+                Basic Stock videos provided by <a href="#" className="text-gray-800">Pexels</a>. 
+                <button 
+                  onClick={() => setShowPricingModal(true)} 
+                  className="text-blue-600 hover:text-blue-700 ml-1"
+                >
+                  Upgrade to iStock
+                </button>
               </div>
               {videoVariants.map((variant, index) => (
                 <div key={index} className="flex-1 flex items-center justify-center p-6">
@@ -1538,17 +1743,17 @@ export function StockVideoUploader() {
                               ${selectedVideo?.videoSrc === result.videoSrc ? 'ring-4 ring-blue-500' : 'hover:ring-2 hover:ring-blue-300'}`}
                     onClick={() => setSelectedVideo(result)}
                   >
-                    <video 
-                      src={result.videoSrc}
-                      className="w-full h-full object-cover"
-                      loop
-                      muted
-                      onMouseEnter={e => e.currentTarget.play()}
-                      onMouseLeave={e => {
-                        e.currentTarget.pause();
-                        e.currentTarget.currentTime = 0;
-                      }}
-                    />
+                    <AbsoluteFill>
+                      <OffthreadVideo 
+                        src={result.videoSrc}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover'
+                        }}
+                        muted
+                      />
+                    </AbsoluteFill>
                   </div>
                 ))}
               </div>
@@ -1566,6 +1771,48 @@ export function StockVideoUploader() {
                 </Button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pricing Modal */}
+      {showPricingModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowPricingModal(false)}>
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold">iStock Pricing</h2>
+              <button 
+                onClick={() => setShowPricingModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/>
+                  <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+            <div className="mb-6">
+              <p className="text-gray-600 mb-4">Get access to premium iStock videos for your content.</p>
+              <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="font-medium">20 Videos Package</span>
+                  <span className="text-xl font-bold">$2</span>
+                </div>
+                <p className="text-sm text-gray-500">This is the same price as what we are paying, we're not making any more, that's just what iStock charges.</p>
+              </div>
+            </div>
+            <Button 
+              className="w-full"
+              onClick={() => {
+                setShowPricingModal(false);
+                toast({
+                  title: "Coming Soon",
+                  description: "This feature will be available soon!",
+                });
+              }}
+            >
+              Upgrade Now
+            </Button>
           </div>
         </div>
       )}

@@ -15,7 +15,7 @@ import {
 } from 'remotion';
 import {z} from 'zod';
 import Subtitle from './Subtitle';
-import {getVideoMetadata} from '@remotion/media-utils';
+import {parseMedia} from '@remotion/media-parser';
 import {loadFont, loadMontserrat} from '../load-font';
 import {NoCaptionFile} from './NoCaptionFile';
 import { TitleBullets } from './TitleBullets';
@@ -43,12 +43,37 @@ export const calculateCaptionedVideoMetadata: CalculateMetadataFunction<
 	z.infer<typeof captionedVideoSchema>
 > = async ({props}) => {
 	const fps = 30;
-	const metadata = await getVideoMetadata(props.src);
-
-	return {
-		fps,
-		durationInFrames: Math.floor(metadata.durationInSeconds * fps),
-	};
+	
+	// Use static dimensions for portrait mode videos
+	const width = 1080;
+	const height = 1920;
+	
+	try {
+		const { slowDurationInSeconds } = await parseMedia({
+			src: props.src,
+			fields: {
+				slowDurationInSeconds: true
+			},
+			acknowledgeRemotionLicense: true
+		});
+		
+		return {
+			fps,
+			durationInFrames: Math.floor(slowDurationInSeconds * fps),
+			width,
+			height
+		};
+	} catch (error) {
+		console.error('Error getting video metadata:', error);
+		// Fallback to a reasonable duration if metadata retrieval fails
+		const fallbackDurationInSeconds = 30;
+		return {
+			fps,
+			durationInFrames: Math.floor(fallbackDurationInSeconds * fps),
+			width,
+			height
+		};
+	}
 };
 
 const getFileExists = (file: string) => {

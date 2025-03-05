@@ -5,8 +5,8 @@ import {
   VIDEO_FPS,
   VIDEO_HEIGHT,
   VIDEO_WIDTH,
-} from "../types/constants";
-import { CaptionedVideo } from "./CaptionedVideo/index";
+} from "./config";
+import { CaptionedVideo, calculateCaptionedVideoMetadata } from "./CaptionedVideo/index";
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -19,16 +19,12 @@ export const RemotionRoot: React.FC = () => {
         width={VIDEO_WIDTH}
         height={VIDEO_HEIGHT}
         defaultProps={{
-          images: [],
-          audioSrc: "",
-          subtitlesSrc: "",
-          durationInFrames: DURATION_IN_FRAMES
+          src: "",
+          overlays: [],
+          transcriptionUrl: "",
+          showCaptions: true
         }}
-        calculateMetadata={({ props }) => {
-          return {
-            durationInFrames: props.durationInFrames || DURATION_IN_FRAMES,
-          };
-        }}
+        calculateMetadata={calculateCaptionedVideoMetadata}
       />
     </>
   );

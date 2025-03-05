@@ -1,7 +1,7 @@
 'use client';
 
 import {Player} from '@remotion/player';
-import {TestAnimationComposition} from '@/components/remotion/testanimationvideo';
+import {TestAnimationComposition} from '@/remotion/testanimationvideo';
 
 export default function Page() {
   return (

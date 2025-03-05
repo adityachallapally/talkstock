@@ -2,7 +2,7 @@
 'use client';
 
 import { Player } from '@remotion/player';
-import { MatchingVideo } from '@/components/remotion/matchingvideo';
+import { MatchingVideo } from '@/remotion/matchingvideo';
 
 export default function Page() {
   return (

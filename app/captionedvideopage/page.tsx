@@ -8,7 +8,7 @@ import {
 	CaptionedVideo,
 	calculateCaptionedVideoMetadata,
 	captionedVideoSchema,
-} from '@/components/remotion/CaptionedVideo';
+} from '@/remotion/CaptionedVideo';
 import { mockOverlays } from '@/lib/getoverlays';
 import { OverlayConfig } from '@/types/constants';
 

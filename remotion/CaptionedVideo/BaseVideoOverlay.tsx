@@ -13,10 +13,16 @@ export const BaseVideoOverlay: React.FC<BaseVideoOverlayProps> = ({
   return (
     <AbsoluteFill>
       {videoSrc && (
-        <OffthreadVideo src={videoSrc} style={overlayStyles.video} muted />
+        <OffthreadVideo 
+          src={videoSrc} 
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover'
+          }} 
+          muted 
+        />
       )}
-      <AbsoluteFill style={overlayStyles.darkOverlay} />
-      <AbsoluteFill style={overlayStyles.scanlines} />
       {children && (
         <AbsoluteFill style={overlayStyles.content}>
           {children}
