@@ -2,21 +2,12 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Player } from '@remotion/player';
 import { AbsoluteFill, OffthreadVideo } from 'remotion';
 import { CaptionedVideo } from '@/remotion/CaptionedVideo';
 import { OverlayConfig, TemplateType } from '@/types/constants';
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { parseMedia } from '@remotion/media-parser';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Trash2, HelpCircle, RotateCcw, Upload, Download, RefreshCw } from 'lucide-react';
 
 // Add type declaration for webkitAudioContext

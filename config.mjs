@@ -7,6 +7,6 @@ import { VERSION } from "remotion/version";
 export const REGION = "us-east-1";
 
 export const SITE_NAME = "craftclips";
-export const RAM = 3008;
+export const RAM = 3006;
 export const DISK = 10240;
 export const TIMEOUT = 900;
