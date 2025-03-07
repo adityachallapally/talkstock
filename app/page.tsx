@@ -37,6 +37,7 @@ export default function Home() {
       <Header />
       <main className="container mx-auto px-4 space-y-24 py-12">
         <Hero selectedTopic={selectedTopic} />
+        TalkStock
         <TrendingTopics onTopicSelect={handleTopicSelect} />
         {/* <InfiniteCarousel gifs={gifs} /> */}
         <Features />
