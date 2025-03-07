@@ -21,7 +21,8 @@ const HorizontalStockVideoPage: React.FC = () => {
       const metadata = await calculateStockVideoMetadata({
         props: { videos: videoUrls },
         defaultProps: {},
-        frame: 0,
+        abortSignal: new AbortController().signal,
+        compositionId: 'horizontal-stock-video'
       });
       setDuration(metadata.durationInFrames);
     };

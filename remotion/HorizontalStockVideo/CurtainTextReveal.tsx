@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { spring, useCurrentFrame, useVideoConfig, interpolate } from 'remotion';
-import { FadeDown } from '../animations/ExitAnimations';
+import { FadeDown, FadeUp } from '../animations/ExitAnimations';
 
 interface CurtainTextRevealProps {
   text: string;

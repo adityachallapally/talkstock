@@ -11,14 +11,9 @@ import {
 } from '@/remotion/CaptionedVideo';
 import { mockOverlays } from '@/lib/getoverlays';
 import { OverlayConfig } from '@/types/constants';
-
-interface VideoCreatorPageProps {
-  overlays: OverlayConfig[];
-}
-
 import generateOverlays from '@/lib/getoverlays';
 
-const VideoCreatorPage: React.FC<VideoCreatorPageProps> = () => {
+const VideoCreatorPage = () => {
   const [overlays, setOverlays] = useState<OverlayConfig[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 

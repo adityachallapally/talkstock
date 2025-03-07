@@ -304,7 +304,7 @@ export const textAnimations = textContent.map((content, index) => {
   if (!animationType) return null;
 
   return {
-    component: React.createElement(animationType.component, {
+    component: React.createElement(animationType.component as any, {
       ...content.content,
       frame: 0,
       duration: frameDuration

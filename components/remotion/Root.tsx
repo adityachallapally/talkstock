@@ -24,7 +24,7 @@ export const RemotionRoot: React.FC = () => {
           transcriptionUrl: "",
           showCaptions: true
         }}
-        calculateMetadata={calculateCaptionedVideoMetadata}
+        calculateMetadata={calculateCaptionedVideoMetadata as any}
       />
     </>
   );

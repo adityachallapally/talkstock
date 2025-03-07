@@ -66,10 +66,15 @@ const VideoCard = ({ video }: { video: VideoData }) => {
     };
 
     const { renderMedia, state, undo } = useRendering("captioned-video", {
-        audioSrc: video.audioSrc,
-        images: video.imageUrls,
-        subtitlesSrc: video.transcriptionSrc,
-        durationInFrames: video.durationInFrames // Add this line
+        src: video.audioSrc,
+        transcriptionUrl: video.transcriptionSrc,
+        overlays: video.imageUrls?.map(url => ({
+            type: 'BULLET_LIST' as any,
+            startFrame: 0,
+            duration: video.durationInFrames || 300,
+            title: video.title || '',
+            imageUrl: url
+        })) || []
     });
 
     const handleDownload = async () => {
@@ -161,10 +166,15 @@ const VideoCard = ({ video }: { video: VideoData }) => {
                                         <Player
                                             component={CaptionedVideo}
                                             inputProps={{
-                                                audioSrc: video.audioSrc,
-                                                images: video.imageUrls,
-                                                subtitlesSrc: video.transcriptionSrc,
-                                                durationInFrames: video.durationInFrames || 300
+                                                src: video.audioSrc,
+                                                transcriptionUrl: video.transcriptionSrc,
+                                                overlays: video.imageUrls?.map(url => ({
+                                                    type: 'BULLET_LIST' as any,
+                                                    startFrame: 0,
+                                                    duration: video.durationInFrames || 300,
+                                                    title: video.title || '',
+                                                    imageUrl: url
+                                                })) || []
                                             }}
                                             durationInFrames={video.durationInFrames || 300}
                                             fps={30}

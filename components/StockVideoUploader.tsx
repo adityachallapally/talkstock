@@ -1583,7 +1583,7 @@ export function StockVideoUploader() {
               {/* Add instructional text */}
               {showInstructions && (
                 <div className="p-4 bg-blue-50 text-blue-800 text-sm relative">
-                  <p>We've auto-populated B-rolls into your setup. If you like them, feel free to download. You can drag the right handle to extend how long you want the B-roll to run, or delete and add your own.</p>
+                  <p>We&apos;ve auto-populated B-rolls into your setup. If you like them, feel free to download. You can drag the right handle to extend how long you want the B-roll to run, or delete and add your own.</p>
                   <button 
                     onClick={() => setShowInstructions(false)}
                     className="absolute top-2 right-2 text-blue-600 hover:text-blue-800"
@@ -1859,7 +1859,7 @@ export function StockVideoUploader() {
                   <span className="font-medium">20 Videos Package</span>
                   <span className="text-xl font-bold">$2</span>
                 </div>
-                <p className="text-sm text-gray-500">This is the same price as what we are paying, we're not making any more, that's just what iStock charges.</p>
+                <p className="text-sm text-gray-500">This is the same price as what we are paying, we&apos;re not making any more, that&apos;s just what iStock charges.</p>
               </div>
             </div>
             <Button 

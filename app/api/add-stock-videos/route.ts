@@ -99,11 +99,10 @@ export async function POST(request: Request) {
     const { renderId, bucketName } = await renderVideo({
       id: COMP_NAME,
       inputProps: {
-        audioSrc: video.videoLink,
-        images: video.imageUrls,
-        subtitlesSrc: transcriptionUrl,
-        durationInFrames: video.durationInFrames || 300,
-        overlays
+        src: video.videoLink,
+        transcriptionUrl: transcriptionUrl,
+        overlays,
+        showCaptions: true
       }
     });
 

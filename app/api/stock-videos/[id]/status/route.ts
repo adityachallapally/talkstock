@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getRenderProgress } from '@/lambda/api';
+import { getProgress } from '@/lambda/api';
 
 export async function GET(
   request: Request,
@@ -12,7 +12,7 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid video ID' }, { status: 400 });
     }
 
-    const video = await db.StockVideo.findUnique({
+    const video = await db.stockVideo.findUnique({
       where: { id },
     });
 
@@ -23,33 +23,43 @@ export async function GET(
     // If video is in RENDERING state, check the render progress
     if (video.status === 'RENDERING') {
       try {
-        const progress = await getRenderProgress(video.renderId);
+        const progress = await getProgress({
+          id: video.renderId,
+          bucketName: video.bucketName || ''
+        });
         
-        if (progress.done) {
+        if (progress.type === "done") {
           // Update video with final URL and status
-          await db.StockVideo.update({
+          await db.stockVideo.update({
             where: { id },
             data: {
-              outputVideoUrl: progress.outputUrl,
+              outputVideoUrl: progress.url,
               status: 'COMPLETED'
             }
           });
           
           return NextResponse.json({
             status: 'COMPLETED',
-            outputUrl: progress.outputUrl
+            outputUrl: progress.url
           });
         }
         
-        return NextResponse.json({
-          status: 'RENDERING',
-          progress: progress.progress,
-          renderId: video.renderId
-        });
+        if (progress.type === "progress") {
+          return NextResponse.json({
+            status: 'RENDERING',
+            progress: progress.progress,
+            renderId: video.renderId
+          });
+        }
+        
+        // Handle error case
+        if (progress.type === "error") {
+          throw new Error(progress.message);
+        }
       } catch (error) {
         console.error('Error checking render progress:', error);
         // If there's an error checking progress, mark as failed
-        await db.StockVideo.update({
+        await db.stockVideo.update({
           where: { id },
           data: { status: 'FAILED' }
         });

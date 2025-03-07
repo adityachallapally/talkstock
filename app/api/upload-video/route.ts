@@ -21,7 +21,10 @@ export async function POST(request: Request) {
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
     const metadata = await getVideoMetadata(buffer)
-    const durationInFrames = Math.ceil(metadata.duration * 30) // 30 fps
+    
+    // Safely access duration or use a default value
+    const durationInSeconds = (metadata as any).duration || 0
+    const durationInFrames = Math.ceil(durationInSeconds * 30) // 30 fps
 
     // Create a record in the database with required fields
     const video = await db.video.create({
