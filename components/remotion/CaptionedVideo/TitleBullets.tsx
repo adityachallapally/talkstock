@@ -1,8 +1,8 @@
 import { AbsoluteFill, OffthreadVideo } from 'remotion';
 import { TitleAnimation, TypewriterText, BoxReveal } from './index';
 import { OverlayConfig } from '../types';
-import { overlayStyles } from './styles';
-import { BaseVideoOverlay } from './BaseVideoOverlay';
+import { overlayStyles } from '@/remotion/CaptionedVideo/styles';
+import { BaseVideoOverlay } from '@/remotion/CaptionedVideo/BaseVideoOverlay';
 
 export const TitleBullets: React.FC<OverlayConfig> = ({
   title,

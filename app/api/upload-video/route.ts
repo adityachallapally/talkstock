@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { put } from '@vercel/blob'
 import { db } from '@/lib/db'
-import { getVideoMetadata } from '@/lib/utils/video'
 
 export async function POST(request: Request) {
   try {
@@ -17,14 +16,14 @@ export async function POST(request: Request) {
       access: 'public',
     })
 
-    // Get video duration and convert to frames (assuming 30fps)
-    const arrayBuffer = await file.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
-    const metadata = await getVideoMetadata(buffer)
+    // // Get video duration and convert to frames (assuming 30fps)
+    // const arrayBuffer = await file.arrayBuffer()
+    // const buffer = Buffer.from(arrayBuffer)
+    // const metadata = await getVideoMetadata(buffer)
     
-    // Safely access duration or use a default value
-    const durationInSeconds = (metadata as any).duration || 0
-    const durationInFrames = Math.ceil(durationInSeconds * 30) // 30 fps
+    // // Safely access duration or use a default value
+    // const durationInSeconds = (metadata as any).duration || 0
+    // const durationInFrames = Math.ceil(durationInSeconds * 30) // 30 fps
 
     // Create a record in the database with required fields
     const video = await db.video.create({
@@ -36,7 +35,7 @@ export async function POST(request: Request) {
         imageUrls: [blob.url], // Using the video URL as the image
         transcriptionSrc: '', // Required field
         caption: 'Uploaded video', // Required field
-        durationInFrames: durationInFrames,
+        durationInFrames: 0,
         postStatus: 'PROCESSING'
       }
     })

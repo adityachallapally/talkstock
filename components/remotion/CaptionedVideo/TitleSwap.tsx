@@ -1,7 +1,7 @@
 import { AbsoluteFill, OffthreadVideo, useCurrentFrame, interpolate } from 'remotion';
 import { OverlayConfig } from '../types';
-import { overlayStyles } from './styles';
-import { BaseVideoOverlay } from './BaseVideoOverlay';
+import { overlayStyles } from '@/remotion/CaptionedVideo/styles';
+import { BaseVideoOverlay } from '@/remotion/CaptionedVideo/BaseVideoOverlay';
 
 export const TitleSwap: React.FC<OverlayConfig> = ({
   title,

@@ -14,17 +14,15 @@ import {
   useCurrentFrame
 } from 'remotion';
 import {z} from 'zod';
-import Subtitle from './Subtitle';
+import Subtitle from '@/remotion/CaptionedVideo/Subtitle';
 import {getVideoMetadata} from '@remotion/media-utils';
-import {loadFont, loadMontserrat} from '../load-font';
-import {NoCaptionFile} from './NoCaptionFile';
+import {loadFont, loadMontserrat} from '@/remotion/load-font';
 import { TitleBullets } from './TitleBullets';
 import { TemplateType, OverlayItem, OverlayConfig } from '../types';
 import { TitleSwap } from './TitleSwap';
 import { NumberHighlight } from './NumberHighlight';
-import { StockVideo } from './StockVideo';
-import LottieOverlay from './LottieOverlay';
-import { overlayStyles } from './styles';
+import { StockVideo } from '@/remotion/CaptionedVideo/StockVideo';
+import { overlayStyles } from '@/remotion/CaptionedVideo/styles';
 
 export type SubtitleProp = {
 	startMs: number;

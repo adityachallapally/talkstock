@@ -1,8 +1,8 @@
 import { AbsoluteFill, OffthreadVideo, useCurrentFrame, interpolate } from 'remotion';
 import { TypewriterText } from './index';
 import { OverlayConfig } from '../types';
-import { overlayStyles } from './styles';
-import { BaseVideoOverlay } from './BaseVideoOverlay';
+import { overlayStyles } from '@/remotion/CaptionedVideo/styles';
+import { BaseVideoOverlay } from '@/remotion/CaptionedVideo/BaseVideoOverlay';
 
 export const NumberHighlight: React.FC<OverlayConfig> = ({
   title,
