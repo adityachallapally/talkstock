@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { useRendering } from "@/helpers/use-rendering";
-import { CompositionProps, COMP_NAME } from "@/types/constants";
+import { useRendering } from "../../helpers/use-rendering";
+import { CompositionProps, COMP_NAME } from "../../types/constants";
 import { AlignEnd } from "./AlignEnd";
 import { Button } from "./Button/Button";
 import { InputContainer } from "./Container";
@@ -10,16 +10,12 @@ import { Input } from "./Input";
 import { ProgressBar } from "./ProgressBar";
 import { Spacing } from "./Spacing";
 
-type RenderControlsProps = {
+export const RenderControls: React.FC<{
+  text: string;
+  setText: React.Dispatch<React.SetStateAction<string>>;
   inputProps: z.infer<typeof CompositionProps>;
-  setInputProps: React.Dispatch<React.SetStateAction<z.infer<typeof CompositionProps>>>;
-};
-
-export const RenderControls: React.FC<RenderControlsProps> = ({
-  inputProps,
-  setInputProps,
-}) => {
-  const { renderMedia, state, undo } = useRendering("captioned-video", inputProps);
+}> = ({ text, setText, inputProps }) => {
+  const { renderMedia, state, undo } = useRendering(COMP_NAME, inputProps);
 
   return (
     <InputContainer>
@@ -27,6 +23,11 @@ export const RenderControls: React.FC<RenderControlsProps> = ({
       state.status === "invoking" ||
       state.status === "error" ? (
         <>
+          <Input
+            disabled={state.status === "invoking"}
+            setText={setText}
+            text={text}
+          ></Input>
           <Spacing></Spacing>
           <AlignEnd>
             <Button

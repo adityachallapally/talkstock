@@ -9,6 +9,7 @@ import { CaptionedVideo } from '@/remotion/CaptionedVideo';
 import { OverlayConfig, TemplateType } from '@/types/constants';
 import { parseMedia } from '@remotion/media-parser';
 import { Trash2, HelpCircle, RotateCcw, Upload, Download, RefreshCw } from 'lucide-react';
+import { RenderControls } from './Remotion/RenderControls';
 
 // Add type declaration for webkitAudioContext
 declare global {
@@ -750,6 +751,36 @@ export function StockVideoUploader() {
       }
     }
   };
+        // Mock overlays based on the logs
+        const mockOverlays = [
+          {
+            startFrame: Math.round((8540 / 1000) * 30),
+            duration: Math.round((2000 / 1000) * 30),
+            type: TemplateType.STOCK_VIDEO,
+            videoSrc: 'https://videos.pexels.com/video-files/5532765/5532765-sd_506_960_25fps.mp4',
+            title: '',
+            provider: 'Pexels'
+          },
+          {
+            startFrame: Math.round((11800 / 1000) * 30),
+            duration: Math.round((2000 / 1000) * 30),
+            type: TemplateType.STOCK_VIDEO,
+            videoSrc: 'https://videos.pexels.com/video-files/5532765/5532765-sd_506_960_25fps.mp4',
+            title: '',
+            provider: 'Pexels'
+          },
+          {
+            startFrame: Math.round((14560 / 1000) * 30),
+            duration: Math.round((2000 / 1000) * 30),
+            type: TemplateType.STOCK_VIDEO,
+            videoSrc: 'https://videos.pexels.com/video-files/5532765/5532765-sd_506_960_25fps.mp4',
+            title: '',
+            provider: 'Pexels'
+          }
+        ];
+        const demoVideoUrl = 'https://hx7mp5wayo6ybdwl.public.blob.vercel-storage.com/IMG_6062-ustELCsT8kuxTiuEmUhR0NTEefvx6P.MP4';
+      const demoTranscriptUrl = 'https://hx7mp5wayo6ybdwl.public.blob.vercel-storage.com/transcript-YxnHCXJcmH4JJqN5LH4M7r79CprrIa.json';
+
 
   const handleDemoClick = async () => {
     setIsUploading(true);
@@ -757,9 +788,7 @@ export function StockVideoUploader() {
     setTranscript([]);
 
     try {
-      const demoVideoUrl = 'https://hx7mp5wayo6ybdwl.public.blob.vercel-storage.com/IMG_6062-ustELCsT8kuxTiuEmUhR0NTEefvx6P.MP4';
-      const demoTranscriptUrl = 'https://hx7mp5wayo6ybdwl.public.blob.vercel-storage.com/transcript-YxnHCXJcmH4JJqN5LH4M7r79CprrIa.json';
-
+      
       console.log('🚀 Starting demo load with:', { demoVideoUrl, demoTranscriptUrl });
 
       // Use static dimensions for portrait mode videos
@@ -810,34 +839,6 @@ export function StockVideoUploader() {
 
       const transcriptData = await transcriptResponse.json();
       console.log('📝 Loaded transcript data:', transcriptData);
-
-      // Mock overlays based on the logs
-      const mockOverlays = [
-        {
-          startFrame: Math.round((8540 / 1000) * 30),
-          duration: Math.round((2000 / 1000) * 30),
-          type: TemplateType.STOCK_VIDEO,
-          videoSrc: 'https://videos.pexels.com/video-files/5532765/5532765-sd_506_960_25fps.mp4',
-          title: '',
-          provider: 'Pexels'
-        },
-        {
-          startFrame: Math.round((11800 / 1000) * 30),
-          duration: Math.round((2000 / 1000) * 30),
-          type: TemplateType.STOCK_VIDEO,
-          videoSrc: 'https://videos.pexels.com/video-files/5532765/5532765-sd_506_960_25fps.mp4',
-          title: '',
-          provider: 'Pexels'
-        },
-        {
-          startFrame: Math.round((14560 / 1000) * 30),
-          duration: Math.round((2000 / 1000) * 30),
-          type: TemplateType.STOCK_VIDEO,
-          videoSrc: 'https://videos.pexels.com/video-files/5532765/5532765-sd_506_960_25fps.mp4',
-          title: '',
-          provider: 'Pexels'
-        }
-      ];
 
       // Create a mock variant with demo content
       const demoVariant = {
@@ -1270,20 +1271,53 @@ export function StockVideoUploader() {
   };
 
   const checkRenderProgress = async (renderId: string, bucketName: string) => {
+    console.log('🔍 Checking render progress for:', { renderId, bucketName });
+    
+    // Ensure we have valid parameters
+    if (!renderId || !bucketName) {
+      console.error('❌ Invalid parameters for checkRenderProgress:', { renderId, bucketName });
+      return;
+    }
+    
     try {
+      // Create the request payload
+      const payload = {
+        id: renderId,
+        bucketName: bucketName,
+      };
+      
+      console.log('📤 Sending progress request with payload:', JSON.stringify(payload, null, 2));
+      
       const response = await fetch('/api/lambda/progress', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          id: renderId,
-          bucketName: bucketName,
-        }),
+        body: JSON.stringify(payload),
       });
 
-      if (!response.ok) throw new Error('Failed to fetch progress');
-      const progress: RenderProgress = await response.json();
+      console.log('📡 Progress response status:', response.status);
+      console.log('📡 Progress response headers:', Object.fromEntries(response.headers.entries()));
+      
+      const responseText = await response.text();
+      console.log('📡 Raw progress response:', responseText);
+
+      if (!response.ok) {
+        let errorMessage = `Failed to fetch progress (${response.status})`;
+        try {
+          const errorData = JSON.parse(responseText);
+          errorMessage = errorData.message || errorData.error || errorMessage;
+        } catch (e) {
+          console.error('Failed to parse error response:', e);
+        }
+        throw new Error(errorMessage);
+      }
+
+      const responseData = JSON.parse(responseText);
+      console.log('✅ Progress data received:', responseData);
+      
+      // Extract the actual progress data, handling potential nested structure
+      const progress: RenderProgress = responseData.data || responseData;
 
       setRenderProgress(progress);
 
@@ -1405,21 +1439,47 @@ export function StockVideoUploader() {
         let errorMessage = `Failed to start render (${response.status})`;
         try {
           const errorData = JSON.parse(responseText);
-          errorMessage = errorData.message || errorMessage;
+          errorMessage = errorData.message || errorData.error || errorMessage;
         } catch (e) {
           console.error('Failed to parse error response:', e);
         }
         throw new Error(errorMessage);
       }
 
-      const data = JSON.parse(responseText);
-      console.log('✅ Render started successfully:', data);
+      const responseData = JSON.parse(responseText);
+      console.log('✅ Render started successfully:', responseData);
+      
+      // Extract the actual data from the nested structure
+      const data = responseData.data || responseData;
+      
+      // Validate the data before starting the interval
+      if (!data.renderId || !data.bucketName) {
+        console.error('❌ Missing required fields in render response data:', data);
+        toast({
+          title: "Error",
+          description: "Invalid response from render service. Missing renderId or bucketName.",
+          variant: "destructive",
+        });
+        setIsRendering(false);
+        return;
+      }
+      
+      console.log('🔄 Starting progress polling with:', { 
+        renderId: data.renderId, 
+        bucketName: data.bucketName 
+      });
+
+      // Define a named function for the interval
+      const pollProgress = () => {
+        console.log('⏱️ Polling progress at:', new Date().toISOString());
+        checkRenderProgress(data.renderId, data.bucketName);
+      };
 
       // Start polling for progress
-      progressIntervalRef.current = setInterval(
-        () => checkRenderProgress(data.renderId, data.bucketName),
-        2000
-      );
+      progressIntervalRef.current = setInterval(pollProgress, 2000);
+      
+      // Call once immediately to start checking
+      pollProgress();
     } catch (error) {
       console.error('❌ Error starting render:', error);
       if (error instanceof Error) {
@@ -1438,6 +1498,16 @@ export function StockVideoUploader() {
       });
     }
   };
+
+  // Add cleanup for interval
+  useEffect(() => {
+    return () => {
+      if (progressIntervalRef.current) {
+        console.log('🧹 Cleaning up progress interval on unmount');
+        clearInterval(progressIntervalRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div className="flex flex-col h-screen bg-white">

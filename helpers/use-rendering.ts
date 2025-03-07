@@ -1,4 +1,3 @@
-//helpers/use-rendering.ts
 import { z } from "zod";
 import { useCallback, useMemo, useState } from "react";
 import { getProgress, renderVideo } from "../lambda/api";
@@ -45,39 +44,27 @@ export const useRendering = (
   });
 
   const renderMedia = useCallback(async () => {
-    console.log("Starting renderMedia function");
-    console.log("Render ID:", id);
-    console.log("Input Props:", JSON.stringify(inputProps, null, 2));
-
     setState({
       status: "invoking",
     });
-
     try {
-      console.log("Calling renderVideo function");
       const { renderId, bucketName } = await renderVideo({ id, inputProps });
-      console.log("Render initiated. Render ID:", renderId, "Bucket Name:", bucketName);
-
       setState({
         status: "rendering",
+        progress: 0,
         renderId: renderId,
         bucketName: bucketName,
-        progress: 0,
       });
 
       let pending = true;
 
       while (pending) {
-        console.log("Fetching render progress");
         const result = await getProgress({
           id: renderId,
           bucketName: bucketName,
         });
-        console.log("Progress result:", JSON.stringify(result, null, 2));
-
         switch (result.type) {
-          case "error":
-            console.error("Render error:", result.message);
+          case "error": {
             setState({
               status: "error",
               renderId: renderId,
@@ -85,9 +72,8 @@ export const useRendering = (
             });
             pending = false;
             break;
-          case "done":
-            console.log("Render completed successfully");
-            console.log("Final result:", JSON.stringify(result, null, 2));
+          }
+          case "done": {
             setState({
               size: result.size,
               url: result.url,
@@ -95,27 +81,25 @@ export const useRendering = (
             });
             pending = false;
             break;
-          case "progress":
-            console.log(`Render progress: ${(result.progress * 100).toFixed(2)}%`);
+          }
+          case "progress": {
             setState({
               status: "rendering",
               bucketName: bucketName,
               progress: result.progress,
               renderId: renderId,
             });
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await wait(1000);
+          }
         }
       }
     } catch (err) {
-      console.error("Error in renderMedia:", err);
       setState({
         status: "error",
+        error: err as Error,
         renderId: null,
-        error: err instanceof Error ? err : new Error(String(err)),
       });
     }
-
-    console.log("Final state:", JSON.stringify(state, null, 2));
   }, [id, inputProps]);
 
   const undo = useCallback(() => {
