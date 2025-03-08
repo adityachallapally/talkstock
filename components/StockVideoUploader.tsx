@@ -386,9 +386,9 @@ const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
 
     try {
       // Extract audio from video and get duration
-      //const { audioBlob, durationInFrames } = await extractAudioFromVideo(file);
-      const durationInFrames=1000;
+      const { audioBlob, durationInFrames } = await extractAudioFromVideo(file);
       
+    console.log(`🎧 Audio extracted successfully. audioBlob: ${audioBlob}, durationInFrames: ${durationInFrames}`);
     console.log(`⏱️ Starting direct upload to Vercel Blob at ${new Date().toISOString()}`);
     const clientUploadStartTime = Date.now();
     
