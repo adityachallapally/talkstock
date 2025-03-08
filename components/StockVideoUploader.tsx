@@ -205,6 +205,7 @@ export function StockVideoUploader() {
   const [pendingTranscriptSegment, setPendingTranscriptSegment] = useState<TranscriptLine | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout>();
+  const [audioExtractionProgress, setAudioExtractionProgress] = useState(0);
   
   // Define processing stages - each time is in seconds when this stage should end
   const processingStages = [
@@ -336,13 +337,31 @@ const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
   setIsUploading(true);
   setShowLoadingScreen(true);
   setUploadProgress(0); // Reset progress
+  setAudioExtractionProgress(0); // Reset audio extraction progress
   setVideoVariants([]);
   setTranscript([]);
 
-    try {
-      // Extract audio from video and get duration
-      const { audioBlob, durationInFrames } = await extractAudioFromVideo(file);
-      
+  // Start audio extraction progress simulation
+  const extractionDuration = 60000; // 1 minute in milliseconds
+  const extractionInterval = 500; // Update every 500ms
+  const extractionSteps = extractionDuration / extractionInterval;
+  const extractionIncrement = 100 / extractionSteps;
+  
+  const extractionProgressInterval = setInterval(() => {
+    setAudioExtractionProgress(prev => {
+      const newProgress = prev + extractionIncrement;
+      return newProgress >= 100 ? 100 : newProgress;
+    });
+  }, extractionInterval);
+
+  try {
+    // Extract audio from video and get duration
+    const { audioBlob, durationInFrames } = await extractAudioFromVideo(file);
+    
+    // Clear the extraction progress interval once extraction is complete
+    clearInterval(extractionProgressInterval);
+    setAudioExtractionProgress(100);
+    
     console.log(`🎧 Audio extracted successfully. audioBlob: ${audioBlob}, durationInFrames: ${durationInFrames}`);
     console.log(`⏱️ Starting direct upload to Vercel Blob at ${new Date().toISOString()}`);
     const clientUploadStartTime = Date.now();
@@ -384,6 +403,8 @@ const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     });
 
   } catch (error) {
+    // Clear the extraction progress interval in case of error
+    clearInterval(extractionProgressInterval);
     console.error('Upload error:', error);
     toast({
       title: "Error",
@@ -895,24 +916,38 @@ const VideoUploadLoadingScreen = () => {
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-6 max-w-md w-full">
         <div className="text-center">
-          <h2 className="text-lg font-semibold mb-2">Uploading Your Video</h2>
-          <p className="text-sm text-gray-500 mb-4">
-            Please wait while we upload your video.
-          </p>
+          <h2 className="text-lg font-semibold mb-2">Processing Your Video</h2>
           
-          {/* Progress bar */}
+          {/* Audio Extraction Progress */}
           <div className="mb-4">
+            <p className="text-sm text-gray-500 mb-2 text-left">
+              Extracting audio
+            </p>
+            <Progress 
+              value={audioExtractionProgress} 
+              className="h-2 transition-all duration-300" 
+              indicatorClassName="bg-green-600"
+            />
+            <div className="text-sm font-medium flex items-center justify-end gap-2 mt-1">
+              <RefreshCw className={`w-3 h-3 ${audioExtractionProgress < 100 ? 'animate-spin' : ''}`} />
+              {Math.round(audioExtractionProgress)}% {audioExtractionProgress >= 100 ? 'Complete' : 'Processing'}
+            </div>
+          </div>
+          
+          {/* Video Upload Progress */}
+          <div className="mb-4">
+            <p className="text-sm text-gray-500 mb-2 text-left">
+              Uploading video
+            </p>
             <Progress 
               value={uploadProgress} 
               className="h-2 transition-all duration-300" 
               indicatorClassName="bg-blue-600"
             />
-          </div>
-          
-          {/* Progress percentage */}
-          <div className="text-sm font-medium flex items-center justify-center gap-2">
-            <RefreshCw className={`w-4 h-4 ${uploadProgress < 100 ? 'animate-spin' : ''}`} />
-            {Math.round(uploadProgress)}% {uploadProgress >= 100 ? 'Complete' : 'Uploaded'}
+            <div className="text-sm font-medium flex items-center justify-end gap-2 mt-1">
+              <RefreshCw className={`w-3 h-3 ${uploadProgress < 100 ? 'animate-spin' : ''}`} />
+              {Math.round(uploadProgress)}% {uploadProgress >= 100 ? 'Complete' : 'Uploaded'}
+            </div>
           </div>
         </div>
       </div>
