@@ -2,13 +2,14 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { Player } from '@remotion/player';
 import { AbsoluteFill, OffthreadVideo } from 'remotion';
 import { CaptionedVideo } from '@/remotion/CaptionedVideo';
 import { OverlayConfig, TemplateType } from '@/types/constants';
 import { parseMedia } from '@remotion/media-parser';
-import { Trash2, HelpCircle, RotateCcw, Upload, Download, RefreshCw } from 'lucide-react';
+import { Trash2, HelpCircle, RotateCcw, Upload, Download, RefreshCw, Check } from 'lucide-react';
 import { RenderControls } from './Remotion/RenderControls';
 import { TranscriptEditor } from './TranscriptEditor';
 
@@ -195,11 +196,22 @@ export function StockVideoUploader() {
   const [showInstructions, setShowInstructions] = useState(true);
   const [isRendering, setIsRendering] = useState(false);
   const [renderProgress, setRenderProgress] = useState<RenderProgress | null>(null);
+  const [showLoadingScreen, setShowLoadingScreen] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [processingStage, setProcessingStage] = useState(0);
   const { toast } = useToast();
   const [selectedVideo, setSelectedVideo] = useState<{ videoSrc: string } | null>(null);
   const [pendingTranscriptSegment, setPendingTranscriptSegment] = useState<TranscriptLine | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout>();
+  
+  // Define processing stages - each time is in seconds when this stage should end
+  const processingStages = [
+    { name: "Uploading video", time: 2 },
+    { name: "Planning AI edits", time: 4 },
+    { name: "Adding B-Rolls", time: 6 },
+    { name: "Finalizing", time: 8 }
+  ];
   
   // Mock overlays based on the logs
   const [mockOverlays, setMockOverlays] = useState([
@@ -275,60 +287,218 @@ export function StockVideoUploader() {
     fileInputRef.current?.click();
   };
   
-  const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const simulateProcessing = () => {
+    setShowLoadingScreen(true);
+    setProcessingStage(0);
+    setUploadProgress(0);
+    
+    const totalDuration = processingStages[processingStages.length - 1].time * 1000; // Total time in ms
+    const startTime = Date.now();
+    
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      
+      // Skip setting upload progress during first stage (0-25%) since the actual upload will control this
+      // For stages after upload, continue auto-simulating
+      const stagePercentage = 100 / processingStages.length;
+      if (processingStage > 0) {
+        // We're past the upload stage, so calculate progress for remaining 75%
+        const baseProgress = stagePercentage; // First stage (upload) is done
+        const remainingProgress = Math.min((elapsed / totalDuration) * 100 * 0.75, 75);
+        setUploadProgress(baseProgress + remainingProgress);
+      }
+      
+      // Update current stage based on upload progress
+      if (uploadProgress < 25) {
+        setProcessingStage(0); // Uploading
+      } else if (uploadProgress < 50) {
+        setProcessingStage(1); // Planning AI edits
+      } else if (uploadProgress < 75) {
+        setProcessingStage(2); // Adding B-Rolls
+      } else {
+        setProcessingStage(3); // Finalizing
+      }
+      
+      if (uploadProgress >= 100) {
+        clearInterval(interval);
+        // Add a small delay before hiding the loading screen to ensure
+        // the user sees the completed state
+        setTimeout(() => {
+          setShowLoadingScreen(false);
+        }, 500);
+      }
+    }, 100);
+    
+    return interval;
+  };
+
+// Helper function to create upload tracker that updates progress
+const createUploadProgressTracker = (
+  file: File, 
+  onProgress: (percent: number) => void
+) => {
+  return async () => {
+    console.log(`📤 Starting upload for file: ${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB)`);
+    const startTime = Date.now();
+    
+    // Create form data
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    // Track upload progress with XMLHttpRequest
+    return new Promise<{ url: string, id: string }>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      
+      // Track upload progress events
+      xhr.upload.addEventListener('loadstart', () => {
+        console.log(`📤 Upload started at ${new Date().toISOString()}`);
+      });
+      
+      xhr.upload.addEventListener('progress', (event) => {
+        if (event.lengthComputable) {
+          const percentComplete = (event.loaded / event.total) * 100;
+          const uploadedMB = (event.loaded / (1024 * 1024)).toFixed(2);
+          const totalMB = (event.total / (1024 * 1024)).toFixed(2);
+          const elapsedSeconds = (Date.now() - startTime) / 1000;
+          const uploadSpeed = (event.loaded / elapsedSeconds / (1024 * 1024)).toFixed(2);
+          
+          console.log(`📤 Upload progress: ${percentComplete.toFixed(1)}% (${uploadedMB}MB / ${totalMB}MB) at ${uploadSpeed} MB/s`);
+          onProgress(percentComplete);
+        }
+      });
+      
+      xhr.upload.addEventListener('load', () => {
+        console.log(`📤 Upload completed in ${((Date.now() - startTime) / 1000).toFixed(2)}s`);
+      });
+      
+      // Track response events
+      xhr.addEventListener('loadstart', () => {
+        console.log(`📥 Server processing started at ${new Date().toISOString()}`);
+      });
+      
+      xhr.addEventListener('load', () => {
+        const processingTime = ((Date.now() - startTime) / 1000).toFixed(2);
+        console.log(`📥 Server response received after ${processingTime}s with status: ${xhr.status}`);
+        
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const response = JSON.parse(xhr.responseText);
+            console.log(`✅ Upload successful! Response:`, response);
+            resolve(response);
+          } catch (error) {
+            console.error(`❌ Failed to parse server response: ${xhr.responseText}`);
+            reject(new Error('Failed to parse server response'));
+          }
+        } else {
+          console.error(`❌ Upload failed with status: ${xhr.status}. Response: ${xhr.responseText}`);
+          reject(new Error(`Upload failed with status: ${xhr.status}`));
+        }
+      });
+      
+      xhr.addEventListener('error', (error) => {
+        console.error(`❌ Upload error after ${((Date.now() - startTime) / 1000).toFixed(2)}s:`, error);
+        reject(new Error('Upload failed'));
+      });
+      
+      xhr.addEventListener('timeout', () => {
+        console.error(`❌ Upload timed out after ${((Date.now() - startTime) / 1000).toFixed(2)}s`);
+        reject(new Error('Upload timed out'));
+      });
+      
+      xhr.addEventListener('abort', () => {
+        console.log(`🛑 Upload aborted after ${((Date.now() - startTime) / 1000).toFixed(2)}s`);
+        reject(new Error('Upload aborted'));
+      });
+      
+      xhr.open('POST', '/api/upload-video');
+      xhr.send(formData);
+    });
+  };
+};
+
+const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files || event.target.files.length === 0) {
       return;
     }
 
+    console.log(`🎬 Upload process started at ${new Date().toISOString()}`);
+    const uploadStartTime = Date.now();
+    
     const file = event.target.files[0];
     setIsUploading(true);
     setVideoVariants([]);
     setTranscript([]);
+    
+    // Start processing simulation
+    console.log(`🔄 Starting processing simulation and showing loading screen`);
+    const processingInterval = simulateProcessing();
 
     try {
       // Extract audio from video and get duration
       const { audioBlob, durationInFrames } = await extractAudioFromVideo(file);
       
-      const formData = new FormData();
-      formData.append('video', file);
-      formData.append('audio', audioBlob, 'audio.wav');
-      formData.append('durationInFrames', durationInFrames.toString());
-
-      const response = await fetch('/api/stock-videos', {
-        method: 'POST',
-        body: formData,
+      // Create upload progress tracker
+      const uploadWithProgress = createUploadProgressTracker(file, (percent) => {
+        // Map upload progress to first stage (0-25% of total)
+        const mappedProgress = percent * 0.25; // 25% of total for upload
+        setUploadProgress(mappedProgress);
       });
-
-      if (!response.ok) {
-        throw new Error('Upload failed');
-      }
-
-      const data = await response.json();
       
-      if (data.success) {
-        // Create a variant for each provider's overlays but only use Pexels
-        const variants = data.overlaysByProvider
-          .map((overlays: OverlayConfig[], index: number) => ({
-            src: data.src,
-            overlays,
-            durationInFrames,
-            transcriptionUrl: data.transcriptionUrl,
-            provider: overlays[0]?.provider || `Provider ${index + 1}`
-          }))
-          .filter(variant => variant.provider === 'Pexels');
-
-        setVideoVariants(variants);
-
-        // Fetch and set transcript
-        const transcriptResponse = await fetch(data.transcriptionUrl);
-        const transcriptData = await transcriptResponse.json();
-        setTranscript(transcriptData.transcription);
-        
-        toast({
-          title: "Success",
-          description: "Video processed successfully!",
-        });
-      }
+      console.log(`⏱️ Starting actual upload via XMLHttpRequest at ${new Date().toISOString()}`);
+      const uploadStartTime = Date.now();
+      
+      // Actually upload to Vercel Blob via our API
+      const response = await uploadWithProgress();
+      const { url, processingTime } = response;
+      
+      const clientUploadTime = (Date.now() - uploadStartTime) / 1000;
+      console.log(`⏱️ Client upload completed in ${clientUploadTime.toFixed(2)}s`);
+      console.log(`⏱️ Server reported times:`, processingTime);
+      
+      // Upload complete (25% done), now auto-advance through the rest of the stages
+      console.log(`📊 Progressing to stage 1: Planning AI edits`);
+      setUploadProgress(25);
+      setProcessingStage(1);
+      
+      // Simulate the remaining steps with auto-advancing progress
+      // We'll use timeouts to simulate each remaining step
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log(`📊 Progressing to stage 2: Adding B-Rolls`);
+      setUploadProgress(50);
+      setProcessingStage(2);
+      
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log(`📊 Progressing to stage 3: Finalizing`);
+      setUploadProgress(75);
+      setProcessingStage(3);
+      
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log(`📊 Processing complete!`);
+      setUploadProgress(100);
+      
+      // Use mock overlays for now instead of fetching from API
+      const mockVariant = {
+        src: url, // Use the real Vercel Blob URL
+        overlays: mockOverlays,
+        durationInFrames,
+        transcriptionUrl: '', // We don't have a real transcript URL
+        provider: 'Pexels'
+      };
+      
+      // Generate mock transcript
+      const mockTranscript = [
+        { text: "This is a sample transcript for the uploaded video.", startMs: 0, endMs: 5000 },
+        { text: "It demonstrates how the B-roll functionality works.", startMs: 5000, endMs: 10000 },
+        { text: "You can select text and add stock videos as B-roll.", startMs: 10000, endMs: 15000 }
+      ];
+      
+      setVideoVariants([mockVariant]);
+      setTranscript(mockTranscript);
+      
+      toast({
+        title: "Success",
+        description: "Video processed successfully!",
+      });
 
     } catch (error) {
       console.error('Upload error:', error);
@@ -338,7 +508,18 @@ export function StockVideoUploader() {
         variant: "destructive",
       });
     } finally {
-      setIsUploading(false);
+      const totalTime = (Date.now() - uploadStartTime) / 1000;
+      console.log(`🏁 Total upload and processing time: ${totalTime.toFixed(2)}s`);
+      
+      // Make sure we see the 100% progress state before hiding the modal
+      setTimeout(() => {
+        console.log(`🔚 Cleaning up and hiding loading screen`);
+        clearInterval(processingInterval);
+        setIsUploading(false);
+        setShowLoadingScreen(false);
+        console.log(`✅ Process complete, loading screen hidden`);
+      }, 1000);
+      
       // Reset the file input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -350,14 +531,32 @@ export function StockVideoUploader() {
     setIsUploading(true);
     setVideoVariants([]);
     setTranscript([]);
+    
+    // Start processing simulation
+    const processingInterval = simulateProcessing();
 
     try {
-      
       console.log('🚀 Starting demo load with:', { demoVideoUrl, demoTranscriptUrl });
 
       // Use static dimensions for portrait mode videos
       const width = 1080;
       const height = 1920;
+      
+      // Simulate progressive stages
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setUploadProgress(25);
+      setProcessingStage(1);
+      
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setUploadProgress(50);
+      setProcessingStage(2);
+      
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setUploadProgress(75);
+      setProcessingStage(3);
+      
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setUploadProgress(100);
       
       // Test video metadata retrieval explicitly with detailed logging
       console.log('📏 Attempting to get video metadata...');
@@ -444,7 +643,9 @@ export function StockVideoUploader() {
         variant: "destructive",
       });
     } finally {
+      clearInterval(processingInterval);
       setIsUploading(false);
+      setShowLoadingScreen(false);
     }
   };
 
@@ -825,8 +1026,80 @@ export function StockVideoUploader() {
     };
   }, []);
 
+  // Custom Video Upload Loading Screen
+  const VideoUploadLoadingScreen = () => {
+    useEffect(() => {
+      // Ensure loading screen closes if it gets stuck
+      const timeout = setTimeout(() => {
+        setShowLoadingScreen(false);
+      }, 15000); // Force close after 15 seconds max
+      
+      return () => clearTimeout(timeout);
+    }, []);
+    
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-6 max-w-md w-full">
+          <div className="text-center">
+            <h2 className="text-lg font-semibold mb-2">Processing Your Video</h2>
+            <p className="text-sm text-gray-500 mb-4">
+              This will take a few seconds. Please wait while we process your video.
+            </p>
+            
+            {/* Progress percentage */}
+            <div className="mb-6 text-sm font-medium">
+              {Math.round(uploadProgress)}% Complete
+            </div>
+            
+            {/* Individual stages */}
+            <div className="space-y-4">
+              {processingStages.map((stage, index) => {
+                const isActive = index === processingStage;
+                const isCompleted = index < processingStage || uploadProgress === 100;
+                const stageProgress = isCompleted ? 100 : isActive ? 
+                  ((uploadProgress - (index > 0 ? processingStages[index - 1].time * 10 : 0)) / 
+                  ((processingStages[index].time - (index > 0 ? processingStages[index - 1].time : 0)) * 10)) * 100 : 0;
+                
+                return (
+                  <div key={index} className="text-left">
+                    <div className="flex items-center mb-1">
+                      <div className={`w-4 h-4 rounded-full mr-2 flex items-center justify-center
+                        ${isCompleted ? 'bg-green-500' : isActive ? 'bg-blue-500 animate-pulse' : 'bg-gray-300'}`}>
+                        {isCompleted && (
+                          <svg className="w-3 h-3 text-white" fill="none" strokeWidth="2.5" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                      </div>
+                      <span className={`text-sm ${isActive ? 'font-medium text-blue-600' : 
+                        isCompleted ? 'font-medium' : 'text-gray-500'}`}>
+                        {stage.name}
+                      </span>
+                    </div>
+                    {(isActive || isCompleted) && (
+                      <div className="ml-6 mr-2 mt-1">
+                        <Progress 
+                          value={stageProgress} 
+                          className={`h-1.5 transition-all duration-300 ${isCompleted ? 'bg-gray-200' : 'bg-gray-200'}`} 
+                          indicatorClassName={isCompleted ? 'bg-green-500' : 'bg-blue-600'}
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-col h-screen bg-white">
+      {/* Show loading screen when uploading */}
+      {showLoadingScreen && <VideoUploadLoadingScreen />}
+      
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-3 border-b">
         <div className="flex items-center gap-4">
@@ -864,9 +1137,10 @@ export function StockVideoUploader() {
             variant="outline" 
             className="px-4 py-2 h-9 flex items-center gap-2"
             onClick={handleButtonClick}
+            disabled={isUploading}
           >
             <Upload className="w-4 h-4" />
-            Upload Another Video
+            {isUploading ? 'Uploading...' : 'Upload Another Video'}
           </Button>
           <Button 
             className="bg-[#4F46E5] hover:bg-[#4338CA] text-white px-4 py-2 h-9 flex items-center gap-2"
