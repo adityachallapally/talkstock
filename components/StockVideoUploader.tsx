@@ -960,7 +960,7 @@ const VideoUploadLoadingScreen = () => {
     // Ensure loading screen closes if it gets stuck
     const timeout = setTimeout(() => {
       setShowLoadingScreen(false);
-    }, 30000); // Force close after 30 seconds max
+    }, 3000000); // Force close after 30 seconds max
     
     return () => clearTimeout(timeout);
   }, []);
