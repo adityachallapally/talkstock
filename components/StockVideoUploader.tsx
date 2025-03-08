@@ -12,6 +12,7 @@ import { parseMedia } from '@remotion/media-parser';
 import { Trash2, HelpCircle, RotateCcw, Upload, Download, RefreshCw, Check } from 'lucide-react';
 import { RenderControls } from './Remotion/RenderControls';
 import { TranscriptEditor } from './TranscriptEditor';
+import { upload } from '@vercel/blob/client';
 
 // Add type declaration for webkitAudioContext
 declare global {
@@ -332,87 +333,36 @@ export function StockVideoUploader() {
     return interval;
   };
 
-// Helper function to create upload tracker that updates progress
-const createUploadProgressTracker = (
+// Helper function for direct client-side upload to Vercel Blob
+const clientSideUpload = (
   file: File, 
   onProgress: (percent: number) => void
 ) => {
   return async () => {
-    console.log(`📤 Starting upload for file: ${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB)`);
+    console.log(`📤 Starting client-side upload for file: ${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB)`);
     const startTime = Date.now();
     
-    // Create form data
-    const formData = new FormData();
-    formData.append('file', file);
-    
-    // Track upload progress with XMLHttpRequest
-    return new Promise<{ url: string, id: string }>((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      
-      // Track upload progress events
-      xhr.upload.addEventListener('loadstart', () => {
-        console.log(`📤 Upload started at ${new Date().toISOString()}`);
+    try {
+      // Use the Vercel Blob client library for upload
+      // This follows the Vercel Blob documentation for client-side uploads
+      const blob = await upload(file.name, file, {
+        access: 'public',
+        handleUploadUrl: '/api/upload-video',
       });
       
-      xhr.upload.addEventListener('progress', (event) => {
-        if (event.lengthComputable) {
-          const percentComplete = (event.loaded / event.total) * 100;
-          const uploadedMB = (event.loaded / (1024 * 1024)).toFixed(2);
-          const totalMB = (event.total / (1024 * 1024)).toFixed(2);
-          const elapsedSeconds = (Date.now() - startTime) / 1000;
-          const uploadSpeed = (event.loaded / elapsedSeconds / (1024 * 1024)).toFixed(2);
-          
-          console.log(`📤 Upload progress: ${percentComplete.toFixed(1)}% (${uploadedMB}MB / ${totalMB}MB) at ${uploadSpeed} MB/s`);
-          onProgress(percentComplete);
-        }
-      });
+      // Since we can't track progress with the official client, we'll simulate progress
+      // This is just for UI feedback
+      onProgress(100);
       
-      xhr.upload.addEventListener('load', () => {
-        console.log(`📤 Upload completed in ${((Date.now() - startTime) / 1000).toFixed(2)}s`);
-      });
+      console.log(`📤 Upload completed in ${((Date.now() - startTime) / 1000).toFixed(2)}s`);
+      console.log(`✅ Upload to Vercel Blob successful!`);
+      console.log(`🔗 File URL: ${blob.url}`);
       
-      // Track response events
-      xhr.addEventListener('loadstart', () => {
-        console.log(`📥 Server processing started at ${new Date().toISOString()}`);
-      });
-      
-      xhr.addEventListener('load', () => {
-        const processingTime = ((Date.now() - startTime) / 1000).toFixed(2);
-        console.log(`📥 Server response received after ${processingTime}s with status: ${xhr.status}`);
-        
-        if (xhr.status >= 200 && xhr.status < 300) {
-          try {
-            const response = JSON.parse(xhr.responseText);
-            console.log(`✅ Upload successful! Response:`, response);
-            resolve(response);
-          } catch (error) {
-            console.error(`❌ Failed to parse server response: ${xhr.responseText}`);
-            reject(new Error('Failed to parse server response'));
-          }
-        } else {
-          console.error(`❌ Upload failed with status: ${xhr.status}. Response: ${xhr.responseText}`);
-          reject(new Error(`Upload failed with status: ${xhr.status}`));
-        }
-      });
-      
-      xhr.addEventListener('error', (error) => {
-        console.error(`❌ Upload error after ${((Date.now() - startTime) / 1000).toFixed(2)}s:`, error);
-        reject(new Error('Upload failed'));
-      });
-      
-      xhr.addEventListener('timeout', () => {
-        console.error(`❌ Upload timed out after ${((Date.now() - startTime) / 1000).toFixed(2)}s`);
-        reject(new Error('Upload timed out'));
-      });
-      
-      xhr.addEventListener('abort', () => {
-        console.log(`🛑 Upload aborted after ${((Date.now() - startTime) / 1000).toFixed(2)}s`);
-        reject(new Error('Upload aborted'));
-      });
-      
-      xhr.open('POST', '/api/upload-video');
-      xhr.send(formData);
-    });
+      return { url: blob.url, id: '0' };
+    } catch (error) {
+      console.error('❌ Client-side upload failed:', error);
+      throw error;
+    }
   };
 };
 
@@ -437,23 +387,19 @@ const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
       // Extract audio from video and get duration
       const { audioBlob, durationInFrames } = await extractAudioFromVideo(file);
       
-      // Create upload progress tracker
-      const uploadWithProgress = createUploadProgressTracker(file, (percent) => {
+      console.log(`⏱️ Starting direct upload to Vercel Blob at ${new Date().toISOString()}`);
+      const clientUploadStartTime = Date.now();
+      
+      // Use direct client-side upload to Vercel Blob
+      const { url } = await clientSideUpload(file, (percent) => {
         // Map upload progress to first stage (0-25% of total)
         const mappedProgress = percent * 0.25; // 25% of total for upload
         setUploadProgress(mappedProgress);
-      });
+      })();
       
-      console.log(`⏱️ Starting actual upload via XMLHttpRequest at ${new Date().toISOString()}`);
-      const uploadStartTime = Date.now();
-      
-      // Actually upload to Vercel Blob via our API
-      const response = await uploadWithProgress();
-      const { url } = response;
-      
-      const clientUploadTime = (Date.now() - uploadStartTime) / 1000;
-      console.log(`⏱️ Client upload completed in ${clientUploadTime.toFixed(2)}s`);
-      console.log(`⏱️ Server response:`, response);
+      const clientUploadTime = (Date.now() - clientUploadStartTime) / 1000;
+      console.log(`⏱️ Client direct upload completed in ${clientUploadTime.toFixed(2)}s`);
+      console.log(`⏱️ File URL:`, url);
       
       // Upload complete (25% done), now auto-advance through the rest of the stages
       console.log(`📊 Progressing to stage 1: Planning AI edits`);
@@ -477,7 +423,8 @@ const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
       setUploadProgress(100);
       
       // Use mock overlays for now instead of fetching from API
-      const mockVariant = {
+      // Create the video variant with the Vercel Blob URL
+      const videoVariant = {
         src: url, // Use the real Vercel Blob URL
         overlays: mockOverlays,
         durationInFrames,
@@ -492,7 +439,7 @@ const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
         { text: "You can select text and add stock videos as B-roll.", startMs: 10000, endMs: 15000 }
       ];
       
-      setVideoVariants([mockVariant]);
+      setVideoVariants([videoVariant]);
       setTranscript(mockTranscript);
       
       toast({
