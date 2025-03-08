@@ -19,7 +19,7 @@ export async function GET(request: Request) {
     // Find the video in the database by URL
     const video = await db.video.findFirst({
       where: {
-        videoLink: url
+        videoUrl: url
       }
     });
     

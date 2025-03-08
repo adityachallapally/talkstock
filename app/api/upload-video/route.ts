@@ -33,21 +33,14 @@ export async function POST(request: Request) {
         console.log(`✅ [upload-video] Client upload completed for ${blob.pathname}`);
         
         try {
-          // Extract filename from pathname
-          const filename = blob.pathname.split('/').pop() || 'uploaded-video';
-          
-          // Create a record in the database with required fields
+          // Create a record in the database with fields matching the Prisma schema
           const video = await db.video.create({
             data: {
-              title: filename,
-              videoLink: blob.url,
-              script: 'Uploaded video', // Required field
-              audioSrc: blob.url, // Using the same URL for audio source
-              imageUrls: [blob.url], // Using the video URL as the image
-              transcriptionSrc: '', // Required field
-              caption: 'Uploaded video', // Required field
-              durationInFrames: 0,
-              postStatus: 'PROCESSING'
+              videoUrl: blob.url,
+              audioUrl: blob.url, // Using the same URL for audio source initially
+              durationInFrames: 0, // Will be updated later after processing
+              transcriptionUrl: null, // Optional field in the schema
+              // userId is optional so we don't need to provide it here
             }
           });
           

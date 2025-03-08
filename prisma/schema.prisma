@@ -31,3 +31,15 @@ model Video {
   updatedAt       DateTime @updatedAt
   userId          String?  // Optional user ID for future authentication
 }
+
+model StockVideo {
+  id               Int      @id @default(autoincrement())
+  originalVideoUrl String   // URL of the uploaded video
+  outputVideoUrl   String?  // URL of the processed video with overlays
+  transcriptionUrl String?  // URL of the transcription file
+  renderId         String?
+  bucketName       String?
+  status          String   @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}

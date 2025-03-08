@@ -13,11 +13,13 @@ const client = new OAuth2Client(
 const SCOPES = ['https://www.googleapis.com/auth/youtube.upload', 'https://www.googleapis.com/auth/youtube.readonly'];
 
 export async function GET(request: NextRequest) {
-  const url = client.generateAuthUrl({
-    access_type: 'offline',
-    scope: SCOPES,
-    include_granted_scopes: true // This allows to request additional scopes in the future without re-prompting the user
-  });
+  return NextResponse.json({ message: 'Hello, world!' }, { status: 200 });
 
-  return NextResponse.redirect(url);
+  // const url = client.generateAuthUrl({
+  //   access_type: 'offline',
+  //   scope: SCOPES,
+  //   include_granted_scopes: true // This allows to request additional scopes in the future without re-prompting the user
+  // });
+
+  // return NextResponse.redirect(url);
 }
