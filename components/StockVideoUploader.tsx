@@ -506,7 +506,6 @@ const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
         variant: "destructive",
       });
     } finally {
-      clearInterval(processingInterval);
       setIsUploading(false);
       setShowLoadingScreen(false);
     }
