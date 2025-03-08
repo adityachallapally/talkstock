@@ -449,11 +449,11 @@ const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
       
       // Actually upload to Vercel Blob via our API
       const response = await uploadWithProgress();
-      const { url, processingTime } = response;
+      const { url } = response;
       
       const clientUploadTime = (Date.now() - uploadStartTime) / 1000;
       console.log(`⏱️ Client upload completed in ${clientUploadTime.toFixed(2)}s`);
-      console.log(`⏱️ Server reported times:`, processingTime);
+      console.log(`⏱️ Server response:`, response);
       
       // Upload complete (25% done), now auto-advance through the rest of the stages
       console.log(`📊 Progressing to stage 1: Planning AI edits`);
