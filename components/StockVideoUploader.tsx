@@ -357,9 +357,6 @@ const clientSideUpload = (
         },
       });
       
-      // No need to set progress to 100% here as it's already done in the onUploadProgress callback
-      // when the upload completes
-      
       console.log(`📤 Upload completed in ${((Date.now() - startTime) / 1000).toFixed(2)}s`);
       console.log(`✅ Upload to Vercel Blob successful!`);
       console.log(`🔗 File URL: ${blob.url}`);
@@ -373,112 +370,89 @@ const clientSideUpload = (
 };
 
 const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!event.target.files || event.target.files.length === 0) {
-      return;
-    }
+  if (!event.target.files || event.target.files.length === 0) {
+    return;
+  }
 
-    console.log(`🎬 Upload process started at ${new Date().toISOString()}`);
-    const uploadStartTime = Date.now();
-    
-    const file = event.target.files[0];
-    setIsUploading(true);
-    setVideoVariants([]);
-    setTranscript([]);
-    
-    // Start processing simulation
-    console.log(`🔄 Starting processing simulation and showing loading screen`);
-    const processingInterval = simulateProcessing();
+  console.log(`🎬 Upload process started at ${new Date().toISOString()}`);
+  const uploadStartTime = Date.now();
+  
+  const file = event.target.files[0];
+  setIsUploading(true);
+  setShowLoadingScreen(true);
+  setUploadProgress(0); // Reset progress
+  setVideoVariants([]);
+  setTranscript([]);
 
     try {
       // Extract audio from video and get duration
-      const { audioBlob, durationInFrames } = await extractAudioFromVideo(file);
+      //const { audioBlob, durationInFrames } = await extractAudioFromVideo(file);
+      const durationInFrames=1000;
       
-      console.log(`⏱️ Starting direct upload to Vercel Blob at ${new Date().toISOString()}`);
-      const clientUploadStartTime = Date.now();
-      
-      // Use direct client-side upload to Vercel Blob
-      const { url } = await clientSideUpload(file, (percent) => {
-        // Map upload progress to first stage (0-25% of total)
-        const mappedProgress = percent * 0.25; // 25% of total for upload
-        setUploadProgress(mappedProgress);
-      })();
-      
-      const clientUploadTime = (Date.now() - clientUploadStartTime) / 1000;
-      console.log(`⏱️ Client direct upload completed in ${clientUploadTime.toFixed(2)}s`);
-      console.log(`⏱️ File URL:`, url);
-      
-      // Upload complete (25% done), now auto-advance through the rest of the stages
-      console.log(`📊 Progressing to stage 1: Planning AI edits`);
-      setUploadProgress(25);
-      setProcessingStage(1);
-      
-      // Simulate the remaining steps with auto-advancing progress
-      // We'll use timeouts to simulate each remaining step
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      console.log(`📊 Progressing to stage 2: Adding B-Rolls`);
-      setUploadProgress(50);
-      setProcessingStage(2);
-      
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      console.log(`📊 Progressing to stage 3: Finalizing`);
-      setUploadProgress(75);
-      setProcessingStage(3);
-      
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      console.log(`📊 Processing complete!`);
-      setUploadProgress(100);
-      
-      // Use mock overlays for now instead of fetching from API
-      // Create the video variant with the Vercel Blob URL
-      const videoVariant = {
-        src: url, // Use the real Vercel Blob URL
-        overlays: mockOverlays,
-        durationInFrames,
-        transcriptionUrl: '', // We don't have a real transcript URL
-        provider: 'Pexels'
-      };
-      
-      // Generate mock transcript
-      const mockTranscript = [
-        { text: "This is a sample transcript for the uploaded video.", startMs: 0, endMs: 5000 },
-        { text: "It demonstrates how the B-roll functionality works.", startMs: 5000, endMs: 10000 },
-        { text: "You can select text and add stock videos as B-roll.", startMs: 10000, endMs: 15000 }
-      ];
-      
-      setVideoVariants([videoVariant]);
-      setTranscript(mockTranscript);
-      
-      toast({
-        title: "Success",
-        description: "Video processed successfully!",
-      });
+    console.log(`⏱️ Starting direct upload to Vercel Blob at ${new Date().toISOString()}`);
+    const clientUploadStartTime = Date.now();
+    
+    // Use direct client-side upload to Vercel Blob
+    // This function will update the progress directly based on actual upload progress
+    const { url } = await clientSideUpload(file, (percent) => {
+      // Update progress directly with actual upload percentage
+      setUploadProgress(percent);
+    })();
+    
+    const clientUploadTime = (Date.now() - clientUploadStartTime) / 1000;
+    console.log(`⏱️ Client direct upload completed in ${clientUploadTime.toFixed(2)}s`);
+    console.log(`⏱️ File URL:`, url);
+    
+    // Upload is complete, now perform additional processing
+    // Create the video variant with the Vercel Blob URL
+    const videoVariant = {
+      src: url,
+      overlays: mockOverlays,
+      durationInFrames,
+      transcriptionUrl: '',
+      provider: 'Pexels'
+    };
+    
+    // Generate mock transcript
+    const mockTranscript = [
+      { text: "This is a sample transcript for the uploaded video.", startMs: 0, endMs: 5000 },
+      { text: "It demonstrates how the B-roll functionality works.", startMs: 5000, endMs: 10000 },
+      { text: "You can select text and add stock videos as B-roll.", startMs: 10000, endMs: 15000 }
+    ];
+    
+    setVideoVariants([videoVariant]);
+    setTranscript(mockTranscript);
+    
+    toast({
+      title: "Success",
+      description: "Video uploaded and processed successfully!",
+    });
 
-    } catch (error) {
-      console.error('Upload error:', error);
-      toast({
-        title: "Error",
-        description: "Failed to upload video. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      const totalTime = (Date.now() - uploadStartTime) / 1000;
-      console.log(`🏁 Total upload and processing time: ${totalTime.toFixed(2)}s`);
-      
-      // Make sure we see the 100% progress state before hiding the modal
-      setTimeout(() => {
-        console.log(`🔚 Cleaning up and hiding loading screen`);
-        clearInterval(processingInterval);
-        setIsUploading(false);
-        setShowLoadingScreen(false);
-        console.log(`✅ Process complete, loading screen hidden`);
-      }, 1000);
-      
-      // Reset the file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+  } catch (error) {
+    console.error('Upload error:', error);
+    toast({
+      title: "Error",
+      description: "Failed to upload video. Please try again.",
+      variant: "destructive",
+    });
+  } finally {
+    const totalTime = (Date.now() - uploadStartTime) / 1000;
+    console.log(`🏁 Total upload time: ${totalTime.toFixed(2)}s`);
+    
+    // Short delay to ensure user sees 100% completion state
+    setTimeout(() => {
+      console.log(`🔚 Cleaning up and hiding loading screen`);
+      setIsUploading(false);
+      setShowLoadingScreen(false);
+      console.log(`✅ Process complete, loading screen hidden`);
+    }, 500);
+    
+    // Reset the file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
-  };
+  }
+};
 
   const handleDemoClick = async () => {
     setIsUploading(true);
@@ -979,74 +953,46 @@ const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     };
   }, []);
 
-  // Custom Video Upload Loading Screen
-  const VideoUploadLoadingScreen = () => {
-    useEffect(() => {
-      // Ensure loading screen closes if it gets stuck
-      const timeout = setTimeout(() => {
-        setShowLoadingScreen(false);
-      }, 15000); // Force close after 15 seconds max
-      
-      return () => clearTimeout(timeout);
-    }, []);
+
+// Modified VideoUploadLoadingScreen component
+const VideoUploadLoadingScreen = () => {
+  useEffect(() => {
+    // Ensure loading screen closes if it gets stuck
+    const timeout = setTimeout(() => {
+      setShowLoadingScreen(false);
+    }, 30000); // Force close after 30 seconds max
     
-    return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6 max-w-md w-full">
-          <div className="text-center">
-            <h2 className="text-lg font-semibold mb-2">Processing Your Video</h2>
-            <p className="text-sm text-gray-500 mb-4">
-              This will take a few seconds. Please wait while we process your video.
-            </p>
-            
-            {/* Progress percentage */}
-            <div className="mb-6 text-sm font-medium">
-              {Math.round(uploadProgress)}% Complete
-            </div>
-            
-            {/* Individual stages */}
-            <div className="space-y-4">
-              {processingStages.map((stage, index) => {
-                const isActive = index === processingStage;
-                const isCompleted = index < processingStage || uploadProgress === 100;
-                const stageProgress = isCompleted ? 100 : isActive ? 
-                  ((uploadProgress - (index > 0 ? processingStages[index - 1].time * 10 : 0)) / 
-                  ((processingStages[index].time - (index > 0 ? processingStages[index - 1].time : 0)) * 10)) * 100 : 0;
-                
-                return (
-                  <div key={index} className="text-left">
-                    <div className="flex items-center mb-1">
-                      <div className={`w-4 h-4 rounded-full mr-2 flex items-center justify-center
-                        ${isCompleted ? 'bg-green-500' : isActive ? 'bg-blue-500 animate-pulse' : 'bg-gray-300'}`}>
-                        {isCompleted && (
-                          <svg className="w-3 h-3 text-white" fill="none" strokeWidth="2.5" stroke="currentColor" viewBox="0 0 24 24">
-                            <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                        )}
-                      </div>
-                      <span className={`text-sm ${isActive ? 'font-medium text-blue-600' : 
-                        isCompleted ? 'font-medium' : 'text-gray-500'}`}>
-                        {stage.name}
-                      </span>
-                    </div>
-                    {(isActive || isCompleted) && (
-                      <div className="ml-6 mr-2 mt-1">
-                        <Progress 
-                          value={stageProgress} 
-                          className={`h-1.5 transition-all duration-300 ${isCompleted ? 'bg-gray-200' : 'bg-gray-200'}`} 
-                          indicatorClassName={isCompleted ? 'bg-green-500' : 'bg-blue-600'}
-                        />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+    return () => clearTimeout(timeout);
+  }, []);
+  
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 max-w-md w-full">
+        <div className="text-center">
+          <h2 className="text-lg font-semibold mb-2">Uploading Your Video</h2>
+          <p className="text-sm text-gray-500 mb-4">
+            Please wait while we upload your video.
+          </p>
+          
+          {/* Progress bar */}
+          <div className="mb-4">
+            <Progress 
+              value={uploadProgress} 
+              className="h-2 transition-all duration-300" 
+              indicatorClassName="bg-blue-600"
+            />
+          </div>
+          
+          {/* Progress percentage */}
+          <div className="text-sm font-medium flex items-center justify-center gap-2">
+            <RefreshCw className={`w-4 h-4 ${uploadProgress < 100 ? 'animate-spin' : ''}`} />
+            {Math.round(uploadProgress)}% {uploadProgress >= 100 ? 'Complete' : 'Uploaded'}
           </div>
         </div>
       </div>
-    );
-  };
+    </div>
+  );
+};
 
   return (
     <div className="flex flex-col h-screen bg-white">
