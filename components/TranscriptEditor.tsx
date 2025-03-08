@@ -20,6 +20,7 @@ interface TranscriptEditorProps {
   setIsSearchOpen: (open: boolean) => void;
   showInstructions: boolean;
   setShowInstructions: (show: boolean) => void;
+  setPendingTranscriptSegment: (segment: TranscriptLine | null) => void;
 }
 
 export const TranscriptEditor: React.FC<TranscriptEditorProps> = ({
@@ -34,13 +35,20 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = ({
   isSearchOpen,
   setIsSearchOpen,
   showInstructions,
-  setShowInstructions
+  setShowInstructions,
+  setPendingTranscriptSegment
 }) => {
   const [selectedText, setSelectedText] = useState('');
   const [selectedTranscriptSegment, setSelectedTranscriptSegment] = useState<TranscriptLine | null>(null);
-  const [pendingTranscriptSegment, setPendingTranscriptSegment] = useState<TranscriptLine | null>(null);
+  const [localPendingTranscriptSegment, setLocalPendingTranscriptSegment] = useState<TranscriptLine | null>(null);
   const [hasExistingOverlay, setHasExistingOverlay] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Update both local and parent state for pendingTranscriptSegment
+  const updatePendingSegment = (segment: TranscriptLine | null) => {
+    setLocalPendingTranscriptSegment(segment);
+    setPendingTranscriptSegment(segment);
+  };
   const { toast } = useToast();
 
   // Use the highlights hook
@@ -173,7 +181,7 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = ({
           startMs: transcript[selectedWords[0].transcriptIndex].startMs,
           endMs: transcript[selectedWords[selectedWords.length - 1].transcriptIndex].endMs
         };
-        setPendingTranscriptSegment(segment);
+        updatePendingSegment(segment);
       }
     }
   };
@@ -198,7 +206,7 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = ({
             });
 
             setSelectedTranscriptSegment(segment);
-            setPendingTranscriptSegment(segment);
+            updatePendingSegment(segment);
             setHasExistingOverlay(false);
         }
     }
@@ -264,7 +272,7 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = ({
     console.log('🔍 Created Segment:', segment);
     
     setSelectedTranscriptSegment(segment);
-    setPendingTranscriptSegment(segment);
+    updatePendingSegment(segment);
     setHasExistingOverlay(true);
   };
 
@@ -283,9 +291,9 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = ({
         index <= Math.max(selectionStart, selectionEnd);
 
       const isSelected = 
-        (pendingTranscriptSegment &&
-         wordObj.startMs >= pendingTranscriptSegment.startMs && 
-         wordObj.endMs <= pendingTranscriptSegment.endMs) ||
+        (localPendingTranscriptSegment &&
+         wordObj.startMs >= localPendingTranscriptSegment.startMs && 
+         wordObj.endMs <= localPendingTranscriptSegment.endMs) ||
         isInSelection;
 
       const isHovered = highlight && hoveredHighlight === highlight.id;
@@ -444,7 +452,7 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = ({
     console.log('🎯 ClickAway - Entry:', {
         isSearchOpen,
         hasSelectedSegment: !!selectedTranscriptSegment,
-        hasPendingSegment: !!pendingTranscriptSegment
+        hasPendingSegment: !!localPendingTranscriptSegment
     });
     
     setSelectedText('');
@@ -453,7 +461,7 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = ({
     if (!isSearchOpen) {
         console.log('🎯 ClickAway - Clearing segments because search is closed');
         setSelectedTranscriptSegment(null);
-        setPendingTranscriptSegment(null);
+        updatePendingSegment(null);
     } else {
         console.log('🎯 ClickAway - Preserving segments because search is open');
     }
@@ -671,13 +679,13 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = ({
           size="sm"
           variant="secondary"
           onClick={() => {
-            if (pendingTranscriptSegment) {
-              setSearchTerm(pendingTranscriptSegment.text);
+            if (localPendingTranscriptSegment) {
+              setSearchTerm(localPendingTranscriptSegment.text);
               setSelectedText('');
               setIsSearchOpen(true);
             }
           }}
-          disabled={!pendingTranscriptSegment}
+          disabled={!localPendingTranscriptSegment}
           className="h-8 px-3 text-sm font-medium flex items-center gap-2"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="stroke-current">
@@ -690,10 +698,10 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = ({
           size="sm"
           variant="destructive"
           onClick={() => {
-            if (videoVariants.length && pendingTranscriptSegment) {
+            if (videoVariants.length && localPendingTranscriptSegment) {
               const variant = videoVariants[0];
-              const deleteStartFrame = Math.round((pendingTranscriptSegment.startMs / 1000) * 30);
-              const deleteEndFrame = Math.round((pendingTranscriptSegment.endMs / 1000) * 30);
+              const deleteStartFrame = Math.round((localPendingTranscriptSegment.startMs / 1000) * 30);
+              const deleteEndFrame = Math.round((localPendingTranscriptSegment.endMs / 1000) * 30);
               const newOverlays = variant.overlays.filter((overlay) => {
                 return !(overlay.type === 'STOCK_VIDEO' &&
                   overlay.startFrame <= deleteEndFrame &&
@@ -704,12 +712,12 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = ({
                 title: "Success",
                 description: "B-Roll deleted successfully",
               });
-              setPendingTranscriptSegment(null);
+              updatePendingSegment(null);
               setSelectedTranscriptSegment(null);
               setHasExistingOverlay(false);
             }
           }}
-          disabled={!pendingTranscriptSegment || !hasExistingOverlay}
+          disabled={!localPendingTranscriptSegment || !hasExistingOverlay}
           className="h-8 px-3 text-sm font-medium flex items-center gap-2"
         >
           <Trash2 className="w-4 h-4" />
@@ -720,12 +728,12 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = ({
           size="sm"
           variant="ghost"
           onClick={() => {
-            setPendingTranscriptSegment(null);
+            updatePendingSegment(null);
             setSelectedTranscriptSegment(null);
             setSelectedText('');
             setHasExistingOverlay(false);
           }}
-          disabled={!pendingTranscriptSegment}
+          disabled={!localPendingTranscriptSegment}
           className="h-8 px-3 text-sm font-medium flex items-center gap-2 ml-auto"
         >
           <RotateCcw className="w-4 h-4" />

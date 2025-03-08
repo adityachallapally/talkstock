@@ -197,11 +197,12 @@ export function StockVideoUploader() {
   const [renderProgress, setRenderProgress] = useState<RenderProgress | null>(null);
   const { toast } = useToast();
   const [selectedVideo, setSelectedVideo] = useState<{ videoSrc: string } | null>(null);
+  const [pendingTranscriptSegment, setPendingTranscriptSegment] = useState<TranscriptLine | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout>();
   
   // Mock overlays based on the logs
-  const mockOverlays = [
+  const [mockOverlays, setMockOverlays] = useState([
     {
       startFrame: Math.round((8540 / 1000) * 30),
       duration: Math.round((2000 / 1000) * 30),
@@ -226,7 +227,7 @@ export function StockVideoUploader() {
       title: '',
       provider: 'Pexels'
     }
-  ];
+  ]);
 
   const demoVideoUrl = 'https://hx7mp5wayo6ybdwl.public.blob.vercel-storage.com/IMG_6062-ustELCsT8kuxTiuEmUhR0NTEefvx6P.MP4';
   const demoTranscriptUrl = 'https://hx7mp5wayo6ybdwl.public.blob.vercel-storage.com/transcript-YxnHCXJcmH4JJqN5LH4M7r79CprrIa.json';
@@ -480,7 +481,7 @@ export function StockVideoUploader() {
   const handleContinueClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     
-    if (!selectedVideo || !videoVariants.length) {
+    if (!selectedVideo || !videoVariants.length || !pendingTranscriptSegment) {
       toast({
         title: "Error",
         description: "Missing required data for video replacement",
@@ -488,6 +489,45 @@ export function StockVideoUploader() {
       });
       return;
     }
+
+    const variant = videoVariants[0];
+    const startFrame = Math.round((pendingTranscriptSegment.startMs / 1000) * 30);
+    const endFrame = Math.round((pendingTranscriptSegment.endMs / 1000) * 30);
+    const duration = Math.max(endFrame - startFrame, 30);
+
+    // Find if there's an existing overlay for this segment
+    const existingOverlayIndex = variant.overlays.findIndex(overlay => 
+      overlay.type === TemplateType.STOCK_VIDEO &&
+      overlay.startFrame <= endFrame && 
+      (overlay.startFrame + overlay.duration) >= startFrame
+    );
+
+    let updatedOverlays = [...variant.overlays];
+    
+    if (existingOverlayIndex !== -1) {
+      // Update existing overlay with new video source
+      updatedOverlays[existingOverlayIndex] = {
+        ...updatedOverlays[existingOverlayIndex],
+        videoSrc: selectedVideo.videoSrc,
+        provider: 'Pexels'
+      };
+    } else {
+      // Create new overlay
+      const newOverlay: OverlayConfig = {
+        startFrame,
+        duration,
+        type: TemplateType.STOCK_VIDEO,
+        videoSrc: selectedVideo.videoSrc,
+        provider: 'Pexels'
+      };
+      updatedOverlays.push(newOverlay);
+    }
+
+    // Update video variants with new overlays
+    setVideoVariants([{
+      ...variant,
+      overlays: updatedOverlays
+    }]);
 
     setIsSearchOpen(false);
     setSelectedVideo(null);
@@ -868,6 +908,7 @@ export function StockVideoUploader() {
               setIsSearchOpen={setIsSearchOpen}
               showInstructions={showInstructions}
               setShowInstructions={setShowInstructions}
+              setPendingTranscriptSegment={setPendingTranscriptSegment}
             />
 
             {/* Video Section */}
@@ -1000,7 +1041,7 @@ export function StockVideoUploader() {
                     onClick={() => setSelectedVideo(result)}
                   >
                     <AbsoluteFill>
-                      <OffthreadVideo 
+                      <video
                         src={result.videoSrc}
                         style={{
                           width: '100%',
