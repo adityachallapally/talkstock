@@ -36,6 +36,35 @@ export function VideoSelector({ onVideoSelected }: VideoSelectorProps) {
   const demoVideoUrl = 'https://hx7mp5wayo6ybdwl.public.blob.vercel-storage.com/IMG_6062-ustELCsT8kuxTiuEmUhR0NTEefvx6P.MP4';
   const demoTranscriptUrl = 'https://hx7mp5wayo6ybdwl.public.blob.vercel-storage.com/transcript-YxnHCXJcmH4JJqN5LH4M7r79CprrIa.json';
 
+  // Save video data to database
+  const saveVideoToDatabase = async (videoData: {
+    videoUrl: string;
+    audioUrl?: string;
+    durationInFrames: number;
+    transcriptionUrl?: string;
+  }) => {
+    try {
+      const response = await fetch('/api/videos', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(videoData),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save video data');
+      }
+
+      const data = await response.json();
+      console.log('✅ Video data saved to database:', data);
+      return data.id;
+    } catch (error) {
+      console.error('❌ Error saving video to database:', error);
+      throw error;
+    }
+  };
+
   const extractAudioFromVideo = async (videoFile: File): Promise<{ audioBlob: Blob, durationInFrames: number }> => {
     return new Promise((resolve, reject) => {
       const video = document.createElement('video');
@@ -153,18 +182,31 @@ export function VideoSelector({ onVideoSelected }: VideoSelectorProps) {
       console.log(`⏱️ Starting direct upload to Vercel Blob at ${new Date().toISOString()}`);
       const clientUploadStartTime = Date.now();
       
-      // Use direct client-side upload to Vercel Blob
-      const { url } = await clientSideUpload(file, (percent) => {
+      // Use direct client-side upload to Vercel Blob for video
+      const { url: videoUrl } = await clientSideUpload(file, (percent) => {
         // Update progress directly with actual upload percentage
         setUploadProgress(percent);
       })();
       
+      // Upload audio blob to Vercel Blob
+      const audioFile = new File([audioBlob], `audio-${file.name.split('.')[0]}.wav`, { type: 'audio/wav' });
+      const { url: audioUrl } = await clientSideUpload(audioFile, () => {})();
+      
       const clientUploadTime = (Date.now() - clientUploadStartTime) / 1000;
       console.log(`⏱️ Client direct upload completed in ${clientUploadTime.toFixed(2)}s`);
-      console.log(`⏱️ File URL:`, url);
+      console.log(`⏱️ Video URL:`, videoUrl);
+      console.log(`⏱️ Audio URL:`, audioUrl);
       
       // Create mock transcript URL (in a real app, you'd generate a real transcript)
       const transcriptionUrl = '';
+      
+      // Save video data to database
+      const videoId = await saveVideoToDatabase({
+        videoUrl,
+        audioUrl,
+        durationInFrames,
+        transcriptionUrl
+      });
       
       toast({
         title: "Success",
@@ -174,7 +216,7 @@ export function VideoSelector({ onVideoSelected }: VideoSelectorProps) {
       // Call the callback with the result
       if (onVideoSelected) {
         onVideoSelected({
-          url,
+          url: videoUrl,
           durationInFrames,
           transcriptionUrl
         });
