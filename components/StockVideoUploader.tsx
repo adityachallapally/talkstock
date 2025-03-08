@@ -348,11 +348,17 @@ const clientSideUpload = (
       const blob = await upload(file.name, file, {
         access: 'public',
         handleUploadUrl: '/api/upload-video',
+        onUploadProgress: (progressEvent) => {
+          console.log(`Loaded ${progressEvent.loaded} bytes`);
+          console.log(`Total ${progressEvent.total} bytes`);
+          console.log(`Percentage ${progressEvent.percentage}%`);
+          // Update the UI progress bar with the actual percentage
+          onProgress(progressEvent.percentage);
+        },
       });
       
-      // Since we can't track progress with the official client, we'll simulate progress
-      // This is just for UI feedback
-      onProgress(100);
+      // No need to set progress to 100% here as it's already done in the onUploadProgress callback
+      // when the upload completes
       
       console.log(`📤 Upload completed in ${((Date.now() - startTime) / 1000).toFixed(2)}s`);
       console.log(`✅ Upload to Vercel Blob successful!`);
