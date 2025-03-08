@@ -287,51 +287,6 @@ export function StockVideoUploader() {
   const handleButtonClick = () => {
     fileInputRef.current?.click();
   };
-  
-  const simulateProcessing = () => {
-    setShowLoadingScreen(true);
-    setProcessingStage(0);
-    setUploadProgress(0);
-    
-    const totalDuration = processingStages[processingStages.length - 1].time * 1000; // Total time in ms
-    const startTime = Date.now();
-    
-    const interval = setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      
-      // Skip setting upload progress during first stage (0-25%) since the actual upload will control this
-      // For stages after upload, continue auto-simulating
-      const stagePercentage = 100 / processingStages.length;
-      if (processingStage > 0) {
-        // We're past the upload stage, so calculate progress for remaining 75%
-        const baseProgress = stagePercentage; // First stage (upload) is done
-        const remainingProgress = Math.min((elapsed / totalDuration) * 100 * 0.75, 75);
-        setUploadProgress(baseProgress + remainingProgress);
-      }
-      
-      // Update current stage based on upload progress
-      if (uploadProgress < 25) {
-        setProcessingStage(0); // Uploading
-      } else if (uploadProgress < 50) {
-        setProcessingStage(1); // Planning AI edits
-      } else if (uploadProgress < 75) {
-        setProcessingStage(2); // Adding B-Rolls
-      } else {
-        setProcessingStage(3); // Finalizing
-      }
-      
-      if (uploadProgress >= 100) {
-        clearInterval(interval);
-        // Add a small delay before hiding the loading screen to ensure
-        // the user sees the completed state
-        setTimeout(() => {
-          setShowLoadingScreen(false);
-        }, 500);
-      }
-    }, 100);
-    
-    return interval;
-  };
 
 // Helper function for direct client-side upload to Vercel Blob
 const clientSideUpload = (
@@ -458,9 +413,6 @@ const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     setIsUploading(true);
     setVideoVariants([]);
     setTranscript([]);
-    
-    // Start processing simulation
-    const processingInterval = simulateProcessing();
 
     try {
       console.log('🚀 Starting demo load with:', { demoVideoUrl, demoTranscriptUrl });
@@ -468,22 +420,6 @@ const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
       // Use static dimensions for portrait mode videos
       const width = 1080;
       const height = 1920;
-      
-      // Simulate progressive stages
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setUploadProgress(25);
-      setProcessingStage(1);
-      
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setUploadProgress(50);
-      setProcessingStage(2);
-      
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setUploadProgress(75);
-      setProcessingStage(3);
-      
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setUploadProgress(100);
       
       // Test video metadata retrieval explicitly with detailed logging
       console.log('📏 Attempting to get video metadata...');
@@ -956,15 +892,6 @@ const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
 
 // Modified VideoUploadLoadingScreen component
 const VideoUploadLoadingScreen = () => {
-  useEffect(() => {
-    // Ensure loading screen closes if it gets stuck
-    const timeout = setTimeout(() => {
-      setShowLoadingScreen(false);
-    }, 3000000); // Force close after 30 seconds max
-    
-    return () => clearTimeout(timeout);
-  }, []);
-  
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-6 max-w-md w-full">
