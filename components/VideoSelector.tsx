@@ -33,6 +33,22 @@ export function VideoSelector({ onVideoSelected }: VideoSelectorProps) {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Add demo video constants
+  const demoVideoUrl = 'https://hx7mp5wayo6ybdwl.public.blob.vercel-storage.com/IMG_6062-ustELCsT8kuxTiuEmUhR0NTEefvx6P.MP4';
+  const demoTranscriptUrl = 'https://hx7mp5wayo6ybdwl.public.blob.vercel-storage.com/transcript-YxnHCXJcmH4JJqN5LH4M7r79CprrIa.json';
+
+  // Add demo function
+  const handleShowDemo = () => {
+    if (onVideoSelected) {
+      onVideoSelected({
+        id: 999, // Demo ID
+        url: demoVideoUrl,
+        durationInFrames: 1620, // ~54 seconds at 30fps
+        transcriptionUrl: demoTranscriptUrl
+      });
+    }
+  };
+
   const extractAudioFromVideo = async (videoFile: File): Promise<{ audioBlob: Blob, durationInFrames: number }> => {
     return new Promise((resolve, reject) => {
       const video = document.createElement('video');
@@ -285,6 +301,16 @@ export function VideoSelector({ onVideoSelected }: VideoSelectorProps) {
       >
         <Upload className="w-4 h-4" />
         {isUploading ? 'Processing...' : 'Select Video'}
+      </Button>
+      
+      {/* Add the demo button back */}
+      <Button
+        variant="outline"
+        onClick={handleShowDemo}
+        disabled={isUploading}
+        className="w-64 mt-2"
+      >
+        Show Demo
       </Button>
       
       <p className="text-sm text-gray-500 mt-4 max-w-md text-center">
