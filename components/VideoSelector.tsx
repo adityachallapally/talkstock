@@ -191,6 +191,11 @@ export function VideoSelector({ onVideoSelected }: VideoSelectorProps) {
       console.log('Video found in database with ID:', checkData.id);
       setUploadedVideoId(checkData.id);
       
+      // Generate and upload transcript
+      console.log('Generating transcript from audio...');
+      const transcriptionUrl = await generateAndUploadTranscript(audioBlob, checkData.id);
+      console.log('Transcript generated and uploaded:', transcriptionUrl);
+      
       toast({
         title: "Success",
         description: "Video uploaded and processed successfully!",
@@ -202,7 +207,7 @@ export function VideoSelector({ onVideoSelected }: VideoSelectorProps) {
           id: checkData.id,
           url,
           durationInFrames,
-          transcriptionUrl: '' // This will be generated later
+          transcriptionUrl // Now we have the transcription URL
         });
       }
 
@@ -231,6 +236,32 @@ export function VideoSelector({ onVideoSelected }: VideoSelectorProps) {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+    }
+  };
+
+  // Add this new function to handle transcript generation and upload
+  const generateAndUploadTranscript = async (audioBlob: Blob, videoId: number): Promise<string> => {
+    // Create a FormData object to send the audio file
+    const formData = new FormData();
+    formData.append('audio', audioBlob, `audio-${videoId}.wav`);
+    
+    try {
+      // Send the audio to a new API endpoint that will handle transcription
+      const response = await fetch('/api/generate-transcript', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate transcript');
+      }
+      
+      const data = await response.json();
+      return data.transcriptionUrl;
+    } catch (error) {
+      console.error('Transcript generation error:', error);
+      throw error;
     }
   };
 
