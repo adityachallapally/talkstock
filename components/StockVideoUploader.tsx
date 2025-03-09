@@ -1141,29 +1141,10 @@ const VideoUploadLoadingScreen = () => {
           </>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center gap-4">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="video/*"
-              onChange={handleUpload}
-              disabled={isUploading}
-              className="hidden"
-            />
-            <Button 
-              onClick={handleButtonClick}
-              disabled={isUploading}
-              className="w-64"
-            >
-              {isUploading ? 'Processing...' : 'Select Video'}
-            </Button>
-            <Button 
-              onClick={handleDemoClick}
-              disabled={isUploading}
-              variant="secondary"
-              className="w-64"
-            >
-              Load Demo Content
-            </Button>
+            <div className="text-center">
+              <h2 className="text-xl font-semibold mb-2">Loading Video</h2>
+              <p className="text-gray-500">Please wait while we prepare your editor</p>
+            </div>
           </div>
         )}
       </div>
