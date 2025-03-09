@@ -16,6 +16,7 @@ declare global {
 }
 
 export interface VideoUploadResult {
+  id: number;
   url: string;
   durationInFrames: number;
   transcriptionUrl?: string;
@@ -106,7 +107,7 @@ export function VideoSelector({ onVideoSelected }: VideoSelectorProps) {
         console.log(`✅ Upload to Vercel Blob successful!`);
         console.log(`🔗 File URL: ${blob.url}`);
         
-        return { url: blob.url, id: '0' };
+        return { url: blob.url };
       } catch (error) {
         console.error('❌ Client-side upload failed:', error);
         throw error;
@@ -149,7 +150,7 @@ export function VideoSelector({ onVideoSelected }: VideoSelectorProps) {
       clearInterval(extractionProgressInterval);
       setAudioExtractionProgress(100);
       
-      console.log(`🎧 Audio extracted successfully. audioBlob: ${audioBlob}, durationInFrames: ${durationInFrames}`);
+      console.log(`🎧 Audio extracted successfully. durationInFrames: ${durationInFrames}`);
       console.log(`⏱️ Starting direct upload to Vercel Blob at ${new Date().toISOString()}`);
       const clientUploadStartTime = Date.now();
       
@@ -163,8 +164,16 @@ export function VideoSelector({ onVideoSelected }: VideoSelectorProps) {
       console.log(`⏱️ Client direct upload completed in ${clientUploadTime.toFixed(2)}s`);
       console.log(`⏱️ File URL:`, url);
       
-      // Create mock transcript URL (in a real app, you'd generate a real transcript)
-      const transcriptionUrl = '';
+      // Check if the video was added to the database
+      console.log('Checking if video was added to database...');
+      const checkResponse = await fetch(`/api/upload-video/status?url=${encodeURIComponent(url)}`);
+      const checkData = await checkResponse.json();
+      
+      if (!checkData.found) {
+        throw new Error('Video was not properly saved to the database');
+      }
+      
+      console.log('Video found in database with ID:', checkData.id);
       
       toast({
         title: "Success",
@@ -174,9 +183,10 @@ export function VideoSelector({ onVideoSelected }: VideoSelectorProps) {
       // Call the callback with the result
       if (onVideoSelected) {
         onVideoSelected({
+          id: checkData.id,
           url,
           durationInFrames,
-          transcriptionUrl
+          transcriptionUrl: '' // This will be generated later
         });
       }
 
@@ -265,6 +275,7 @@ export function VideoSelector({ onVideoSelected }: VideoSelectorProps) {
       // Call the callback with the demo result
       if (onVideoSelected) {
         onVideoSelected({
+          id: 0,
           url: demoVideoUrl,
           durationInFrames,
           transcriptionUrl: demoTranscriptUrl
@@ -310,72 +321,4 @@ export function VideoSelector({ onVideoSelected }: VideoSelectorProps) {
                 indicatorClassName="bg-green-600"
               />
               <div className="text-sm font-medium flex items-center justify-end gap-2 mt-1">
-                <RefreshCw className={`w-3 h-3 ${audioExtractionProgress < 100 ? 'animate-spin' : ''}`} />
-                {Math.round(audioExtractionProgress)}% {audioExtractionProgress >= 100 ? 'Complete' : 'Processing'}
-              </div>
-            </div>
-            
-            {/* Video Upload Progress */}
-            <div className="mb-4">
-              <p className="text-sm text-gray-500 mb-2 text-left">
-                Uploading video
-              </p>
-              <Progress 
-                value={uploadProgress} 
-                className="h-2 transition-all duration-300" 
-                indicatorClassName="bg-blue-600"
-              />
-              <div className="text-sm font-medium flex items-center justify-end gap-2 mt-1">
-                <RefreshCw className={`w-3 h-3 ${uploadProgress < 100 ? 'animate-spin' : ''}`} />
-                {Math.round(uploadProgress)}% {uploadProgress >= 100 ? 'Complete' : 'Uploaded'}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  return (
-    <div className="flex flex-col items-center justify-center min-h-[400px] gap-4 p-6">
-      {/* Show loading screen when uploading */}
-      {showLoadingScreen && <VideoUploadLoadingScreen />}
-      
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="video/*"
-        onChange={handleUpload}
-        disabled={isUploading}
-        className="hidden"
-      />
-      
-      <div className="text-center mb-6">
-        <h2 className="text-2xl font-semibold mb-2">Upload Your Video</h2>
-        <p className="text-gray-600">Select a video file to upload or use our demo content</p>
-      </div>
-      
-      <Button 
-        onClick={handleButtonClick}
-        disabled={isUploading}
-        className="w-64 flex items-center gap-2"
-      >
-        <Upload className="w-4 h-4" />
-        {isUploading ? 'Processing...' : 'Select Video'}
-      </Button>
-      
-      <Button 
-        onClick={handleDemoClick}
-        disabled={isUploading}
-        variant="secondary"
-        className="w-64"
-      >
-        Load Demo Content
-      </Button>
-      
-      <p className="text-sm text-gray-500 mt-4 max-w-md text-center">
-        Supported formats: MP4, MOV, AVI, WebM. Maximum file size: 500MB.
-      </p>
-    </div>
-  );
-} 
+                <RefreshCw className={`w-3 h-3 ${audioExtractionProgress < 100 ? 'animate-spin' : ''}`
