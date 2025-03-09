@@ -531,10 +531,7 @@ const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
         description: `Failed to load demo content: ${error.message}`,
         variant: "destructive",
       });
-    } finally {
-      setIsUploading(false);
-      setShowLoadingScreen(false);
-    }
+    } 
   };
 
   // Handle search operation

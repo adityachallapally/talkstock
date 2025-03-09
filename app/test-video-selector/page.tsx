@@ -3,9 +3,12 @@
 import { useState } from 'react';
 import { VideoSelector, VideoUploadResult } from '@/components/VideoSelector';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { useRouter } from 'next/navigation';
 
 export default function TestVideoSelectorPage() {
   const [selectedVideo, setSelectedVideo] = useState<VideoUploadResult | null>(null);
+  const router = useRouter();
 
   const handleVideoSelected = (result: VideoUploadResult) => {
     console.log('Video selected:', result);
@@ -60,6 +63,14 @@ export default function TestVideoSelectorPage() {
             >
               Select Another Video
             </button>
+            
+            <Button
+              variant="secondary"
+              onClick={() => router.push(`/stock-videos?videoId=${selectedVideo.id}`)}
+              className="mt-4 w-full"
+            >
+              Edit with Stock Videos
+            </Button>
           </Card>
         </div>
       )}
