@@ -6,6 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { RefreshCw, Upload } from 'lucide-react';
 import { upload } from '@vercel/blob/client';
+import { useRouter } from 'next/navigation';
 
 // Add type declaration for webkitAudioContext
 declare global {
@@ -30,8 +31,10 @@ export function VideoSelector({ onVideoSelected }: VideoSelectorProps) {
   const [showLoadingScreen, setShowLoadingScreen] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [audioExtractionProgress, setAudioExtractionProgress] = useState(0);
+  const [uploadedVideoId, setUploadedVideoId] = useState<number | null>(null);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
 
   // Add demo video constants
   const demoVideoUrl = 'https://hx7mp5wayo6ybdwl.public.blob.vercel-storage.com/IMG_6062-ustELCsT8kuxTiuEmUhR0NTEefvx6P.MP4';
@@ -186,6 +189,7 @@ export function VideoSelector({ onVideoSelected }: VideoSelectorProps) {
       }
       
       console.log('Video found in database with ID:', checkData.id);
+      setUploadedVideoId(checkData.id);
       
       toast({
         title: "Success",
@@ -227,6 +231,13 @@ export function VideoSelector({ onVideoSelected }: VideoSelectorProps) {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+    }
+  };
+
+  // Function to navigate to StockVideoUploader with the video ID
+  const goToStockVideoEditor = () => {
+    if (uploadedVideoId) {
+      router.push(`/stock-videos?videoId=${uploadedVideoId}`);
     }
   };
 
@@ -312,6 +323,17 @@ export function VideoSelector({ onVideoSelected }: VideoSelectorProps) {
       >
         Show Demo
       </Button>
+      
+      {/* Add button to go to StockVideoUploader */}
+      {uploadedVideoId && (
+        <Button
+          variant="secondary"
+          onClick={goToStockVideoEditor}
+          className="w-64 mt-4"
+        >
+          Edit with Stock Videos
+        </Button>
+      )}
       
       <p className="text-sm text-gray-500 mt-4 max-w-md text-center">
         Supported formats: MP4, MOV, AVI, WebM. Maximum file size: 500MB.

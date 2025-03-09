@@ -185,7 +185,12 @@ export const useHighlights = (transcript: TranscriptLine[], videoVariants: Video
   };
 };
 
-export function StockVideoUploader() {
+// Add this to the StockVideoUploader component props
+interface StockVideoUploaderProps {
+  initialVideoId?: number;
+}
+
+export function StockVideoUploader({ initialVideoId }: StockVideoUploaderProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [videoVariants, setVideoVariants] = useState<VideoVariant[]>([]);
   const [showCaptions, setShowCaptions] = useState(true);
@@ -909,6 +914,58 @@ const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     };
   }, []);
 
+  // Add a useEffect to load the video when initialVideoId is provided
+  useEffect(() => {
+    if (initialVideoId) {
+      loadVideoById(initialVideoId);
+    }
+  }, [initialVideoId]);
+  
+  // Function to load a video by ID
+  const loadVideoById = async (id: number) => {
+    try {
+      
+      // Fetch video details from the API
+      const response = await fetch(`/api/videos/${id}`);
+      if (!response.ok) {
+        throw new Error('Failed to load video');
+      }
+      
+      const videoData = await response.json();
+      
+      // For now, create a dummy transcript if none exists
+      const dummyTranscript: TranscriptLine[] = [
+        { text: "This is a dummy transcript for testing.", startMs: 0, endMs: 3000 },
+        { text: "It will be replaced with real transcription data later.", startMs: 3000, endMs: 6000 },
+        { text: "Each line represents a segment of speech in the video.", startMs: 6000, endMs: 9000 },
+      ];
+      
+      // Set up the video variant with the loaded data
+      setVideoVariants([{
+        src: videoData.videoLink || videoData.url,
+        overlays: mockOverlays, // Use the existing mock overlays for now
+        durationInFrames: videoData.durationInFrames || 1800, // Default to 60 seconds if not available
+        transcriptionUrl: videoData.transcriptionUrl || '',
+        provider: 'Pexels'
+      }]);
+      
+      // Set the transcript
+      setTranscript(videoData.transcript || dummyTranscript);
+      
+      toast({
+        title: "Success",
+        description: "Video loaded successfully!",
+      });
+      
+    } catch (error) {
+      console.error('Error loading video:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load video. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
 // Modified VideoUploadLoadingScreen component
 const VideoUploadLoadingScreen = () => {
