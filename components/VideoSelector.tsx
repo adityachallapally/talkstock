@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { RefreshCw, Upload } from 'lucide-react';
 import { upload } from '@vercel/blob/client';
-import { parseMedia } from '@remotion/media-parser';
 
 // Add type declaration for webkitAudioContext
 declare global {
@@ -33,9 +32,6 @@ export function VideoSelector({ onVideoSelected }: VideoSelectorProps) {
   const [audioExtractionProgress, setAudioExtractionProgress] = useState(0);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const demoVideoUrl = 'https://hx7mp5wayo6ybdwl.public.blob.vercel-storage.com/IMG_6062-ustELCsT8kuxTiuEmUhR0NTEefvx6P.MP4';
-  const demoTranscriptUrl = 'https://hx7mp5wayo6ybdwl.public.blob.vercel-storage.com/transcript-YxnHCXJcmH4JJqN5LH4M7r79CprrIa.json';
 
   const extractAudioFromVideo = async (videoFile: File): Promise<{ audioBlob: Blob, durationInFrames: number }> => {
     return new Promise((resolve, reject) => {
@@ -218,90 +214,6 @@ export function VideoSelector({ onVideoSelected }: VideoSelectorProps) {
     }
   };
 
-  const handleDemoClick = async () => {
-    setIsUploading(true);
-    setShowLoadingScreen(true);
-
-    try {
-      console.log('🚀 Starting demo load with:', { demoVideoUrl, demoTranscriptUrl });
-      
-      // Test video metadata retrieval explicitly with detailed logging
-      console.log('📏 Attempting to get video metadata...');
-      
-      // Initialize slowDurationInSeconds with a default value
-      let slowDurationInSeconds = 30; // Default 30 seconds
-      
-      try {
-        console.log('📏 Calling parseMedia with URL:', demoVideoUrl);
-        const metadata = await parseMedia({
-          src: demoVideoUrl,
-          fields: {
-            slowDurationInSeconds: true
-          },
-          acknowledgeRemotionLicense: true
-        });
-        console.log('📏 Video metadata retrieved successfully:', {
-          slowDurationInSeconds: metadata.slowDurationInSeconds,
-          fullMetadata: metadata
-        });
-        
-        slowDurationInSeconds = metadata.slowDurationInSeconds;
-      } catch (metadataError) {
-        console.error('❌ Failed to get video metadata:', {
-          error: metadataError,
-          message: metadataError.message,
-          stack: metadataError.stack
-        });
-        console.warn('⚠️ Using fallback duration:', slowDurationInSeconds);
-      }
-
-      // Calculate frames using the metadata (either retrieved or fallback)
-      const durationInFrames = Math.round(slowDurationInSeconds * 30);
-      console.log('📏 Using duration in frames:', durationInFrames);
-
-      // Check transcript URL accessibility
-      console.log('📝 Checking transcript URL accessibility...');
-      const transcriptResponse = await fetch(demoTranscriptUrl);
-      
-      if (!transcriptResponse.ok) {
-        throw new Error(`Transcript URL is not accessible: ${transcriptResponse.status} ${transcriptResponse.statusText}`);
-      }
-      
-      toast({
-        title: "Success",
-        description: "Demo content loaded successfully!",
-      });
-
-      // Call the callback with the demo result
-      if (onVideoSelected) {
-        onVideoSelected({
-          id: 0,
-          url: demoVideoUrl,
-          durationInFrames,
-          transcriptionUrl: demoTranscriptUrl
-        });
-      }
-
-    } catch (error) {
-      console.error('❌ Demo loading error:', error);
-      // Log detailed error information
-      console.error('Error details:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack,
-      });
-      
-      toast({
-        title: "Error",
-        description: `Failed to load demo content: ${error.message}`,
-        variant: "destructive",
-      });
-    } finally {
-      setIsUploading(false);
-      setShowLoadingScreen(false);
-    }
-  };
-
   // Loading screen component
   const VideoUploadLoadingScreen = () => {
     return (
@@ -321,4 +233,63 @@ export function VideoSelector({ onVideoSelected }: VideoSelectorProps) {
                 indicatorClassName="bg-green-600"
               />
               <div className="text-sm font-medium flex items-center justify-end gap-2 mt-1">
-                <RefreshCw className={`w-3 h-3 ${audioExtractionProgress < 100 ? 'animate-spin' : ''}`
+                <RefreshCw className={`w-3 h-3 ${audioExtractionProgress < 100 ? 'animate-spin' : ''}`} />
+                {Math.round(audioExtractionProgress)}% {audioExtractionProgress >= 100 ? 'Complete' : 'Processing'}
+              </div>
+            </div>
+            
+            {/* Video Upload Progress */}
+            <div className="mb-4">
+              <p className="text-sm text-gray-500 mb-2 text-left">
+                Uploading video
+              </p>
+              <Progress 
+                value={uploadProgress} 
+                className="h-2 transition-all duration-300" 
+                indicatorClassName="bg-blue-600"
+              />
+              <div className="text-sm font-medium flex items-center justify-end gap-2 mt-1">
+                <RefreshCw className={`w-3 h-3 ${uploadProgress < 100 ? 'animate-spin' : ''}`} />
+                {Math.round(uploadProgress)}% {uploadProgress >= 100 ? 'Complete' : 'Uploaded'}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[400px] gap-4 p-6">
+      {/* Show loading screen when uploading */}
+      {showLoadingScreen && <VideoUploadLoadingScreen />}
+      
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="video/*"
+        onChange={handleUpload}
+        disabled={isUploading}
+        className="hidden"
+      />
+      
+      <div className="text-center mb-6">
+        <h2 className="text-2xl font-semibold mb-2">Upload Your Video</h2>
+        <p className="text-gray-600">Select a video file to upload</p>
+      </div>
+      
+      <Button 
+        onClick={handleButtonClick}
+        disabled={isUploading}
+        className="w-64 flex items-center gap-2"
+      >
+        <Upload className="w-4 h-4" />
+        {isUploading ? 'Processing...' : 'Select Video'}
+      </Button>
+      
+      <p className="text-sm text-gray-500 mt-4 max-w-md text-center">
+        Supported formats: MP4, MOV, AVI, WebM. Maximum file size: 500MB.
+      </p>
+    </div>
+  );
+}
