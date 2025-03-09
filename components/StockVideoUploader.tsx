@@ -386,21 +386,85 @@ const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     // Create the video variant with the Vercel Blob URL
     const videoVariant = {
       src: url,
-      overlays: mockOverlays,
+      overlays: mockOverlays, // We'll update this after generating the transcript
       durationInFrames,
       transcriptionUrl: '',
       provider: 'Pexels'
     };
     
-    // Generate mock transcript
+    // Set initial state with mock data while we generate the real transcript
     const mockTranscript = [
-      { text: "This is a sample transcript for the uploaded video.", startMs: 0, endMs: 5000 },
-      { text: "It demonstrates how the B-roll functionality works.", startMs: 5000, endMs: 10000 },
-      { text: "You can select text and add stock videos as B-roll.", startMs: 10000, endMs: 15000 }
+      { text: "Generating transcript and B-roll suggestions...", startMs: 0, endMs: 5000 },
+      { text: "This may take a minute or two.", startMs: 5000, endMs: 10000 },
+      { text: "The content will update automatically when ready.", startMs: 10000, endMs: 15000 }
     ];
     
     setVideoVariants([videoVariant]);
     setTranscript(mockTranscript);
+    
+    // If we have a video ID, generate a transcript and overlays
+    if (initialVideoId) {
+      try {
+        // First create a FormData with the audio file
+        const formData = new FormData();
+        formData.append('audio', audioBlob, `audio-${initialVideoId}.wav`);
+        
+        // Call the transcript generation API
+        const transcriptResponse = await fetch('/api/generate-transcript', {
+          method: 'POST',
+          body: formData
+        });
+        
+        if (!transcriptResponse.ok) {
+          console.error('Transcript generation failed');
+          throw new Error('Failed to generate transcript');
+        }
+        
+        const transcriptData = await transcriptResponse.json();
+        console.log('Transcript generated:', transcriptData);
+        
+        // If we have a transcription URL, fetch the transcript
+        if (transcriptData.transcriptionUrl) {
+          try {
+            const response = await fetch(transcriptData.transcriptionUrl);
+            if (response.ok) {
+              const data = await response.json();
+              
+              // Update the state with the real transcript and overlays
+              setTranscript(data.transcription);
+              
+              // If overlays were generated, update the video variant
+              if (transcriptData.overlays && transcriptData.overlays.length > 0) {
+                setVideoVariants([{
+                  ...videoVariant,
+                  overlays: transcriptData.overlays,
+                  transcriptionUrl: transcriptData.transcriptionUrl
+                }]);
+              } else {
+                setVideoVariants([{
+                  ...videoVariant,
+                  transcriptionUrl: transcriptData.transcriptionUrl
+                }]);
+              }
+              
+              console.log('Updated video with transcript and overlays');
+            }
+          } catch (transcriptFetchError) {
+            console.error('Error fetching transcript:', transcriptFetchError);
+          }
+        }
+      } catch (transcriptError) {
+        console.error('Error generating transcript:', transcriptError);
+        toast({
+          title: "Warning",
+          description: "Video uploaded but transcript generation failed.",
+          variant: "destructive",
+        });
+      }
+    } else {
+      setVideoVariants([videoVariant]);
+      setTranscript(mockTranscript);
+    }
     
     toast({
       title: "Success",
@@ -921,6 +985,7 @@ const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
   // Function to load a video by ID
   const loadVideoById = async (id: number) => {
     try {
+      console.log(`Loading video with ID: ${id}`);
       
       // Fetch video details from the API
       const response = await fetch(`/api/videos/${id}`);
@@ -929,6 +994,7 @@ const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
       }
       
       const videoData = await response.json();
+      console.log('Loaded video data:', videoData);
       
       // For now, create a dummy transcript if none exists
       const dummyTranscript: TranscriptLine[] = [
@@ -937,10 +1003,14 @@ const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
         { text: "Each line represents a segment of speech in the video.", startMs: 6000, endMs: 9000 },
       ];
       
+      // Use overlays from the database if available, fallback to mock overlays if not
+      const videoOverlays = videoData.overlays || mockOverlays;
+      console.log(`Using ${videoData.overlays ? 'database' : 'mock'} overlays:`, videoOverlays);
+      
       // Set up the video variant with the loaded data
       setVideoVariants([{
         src: videoData.videoLink || videoData.url,
-        overlays: mockOverlays, // Use the existing mock overlays for now
+        overlays: videoOverlays,
         durationInFrames: videoData.durationInFrames || 1800, // Default to 60 seconds if not available
         transcriptionUrl: videoData.transcriptionUrl || '',
         provider: 'Pexels'
@@ -959,6 +1029,43 @@ const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
       toast({
         title: "Error",
         description: "Failed to load video. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  // Function to save overlays to the database
+  const saveOverlays = async () => {
+    if (!videoVariants.length || !initialVideoId) return;
+    
+    try {
+      const variant = videoVariants[0];
+      console.log('Saving overlays to database:', variant.overlays);
+      
+      const response = await fetch(`/api/videos/${initialVideoId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          overlays: variant.overlays,
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to save overlays');
+      }
+      
+      toast({
+        title: "Success",
+        description: "Overlays saved successfully!",
+      });
+      
+    } catch (error) {
+      console.error('Error saving overlays:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save overlays. Please try again.",
         variant: "destructive",
       });
     }
@@ -1056,6 +1163,16 @@ const VideoUploadLoadingScreen = () => {
             <Upload className="w-4 h-4" />
             {isUploading ? 'Uploading...' : 'Upload Another Video'}
           </Button>
+          {initialVideoId && (
+            <Button 
+              variant="outline" 
+              className="px-4 py-2 h-9 flex items-center gap-2"
+              onClick={saveOverlays}
+            >
+              <Check className="w-4 h-4" />
+              Save Overlays
+            </Button>
+          )}
           <Button 
             className="bg-[#4F46E5] hover:bg-[#4338CA] text-white px-4 py-2 h-9 flex items-center gap-2"
             onClick={handleDownload}

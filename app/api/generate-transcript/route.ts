@@ -6,6 +6,7 @@ import { writeFile } from 'fs/promises';
 import { createReadStream } from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { generateStockVideoOverlays } from '@/lib/getoverlays';
 
 export async function POST(request: Request) {
   console.log('Received request to generate transcript');
@@ -84,26 +85,52 @@ export async function POST(request: Request) {
       }, { status: 404 });
     }
 
-    // Update database record with transcription URL
-    console.log('Updating database record with transcription URL...');
+    // Generate stock video overlays based on the transcript
+    console.log('Generating stock video overlays...');
     try {
+      const overlayGroups = await generateStockVideoOverlays(transcriptionBlob.url);
+      
+      // Take the first overlay group (typically Pexels provider)
+      const overlays = overlayGroups.length > 0 ? overlayGroups[0] : [];
+      
+      console.log(`Generated ${overlays.length} stock video overlays`);
+
+      // Update database record with transcription URL and overlays
+      console.log('Updating database record with transcription URL and overlays...');
+      await db.video.update({
+        where: { id: videoId },
+        data: {
+          transcriptionSrc: transcriptionBlob.url,
+          overlays: overlays,
+        },
+      });
+      console.log('Database updated successfully');
+
+      return NextResponse.json({ 
+        success: true,
+        transcriptionUrl: transcriptionBlob.url,
+        overlays: overlays,
+        message: 'Transcript and overlays generated successfully'
+      });
+      
+    } catch (overlaysError) {
+      console.error('Error generating overlays:', overlaysError);
+      
+      // Update database record with just the transcription URL if overlays fail
       await db.video.update({
         where: { id: videoId },
         data: {
           transcriptionSrc: transcriptionBlob.url,
         },
       });
-      console.log('Database updated successfully');
-    } catch (dbError) {
-      console.error('Database update error:', dbError);
-      // Continue execution even if DB update fails - we'll return the URL anyway
+      
+      return NextResponse.json({ 
+        success: true,
+        transcriptionUrl: transcriptionBlob.url,
+        error: 'Overlays generation failed',
+        message: 'Transcript generated successfully but overlays failed'
+      });
     }
-
-    return NextResponse.json({ 
-      success: true,
-      transcriptionUrl: transcriptionBlob.url,
-      message: 'Transcript generated successfully'
-    });
 
   } catch (error) {
     console.error('Error generating transcript:', error);

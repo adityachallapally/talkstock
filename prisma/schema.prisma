@@ -75,6 +75,7 @@ model Video {
   postedAt         DateTime?
   postStatus       String   @default("pending") // "pending", "posted", "failed"
   durationInFrames Int?
+  overlays         Json? 
 }
 
 model StockVideo {
