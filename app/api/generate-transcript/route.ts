@@ -101,7 +101,7 @@ export async function POST(request: Request) {
         where: { id: videoId },
         data: {
           transcriptionSrc: transcriptionBlob.url,
-          overlays: overlays,
+          overlays: overlays as any,
         },
       });
       console.log('Database updated successfully');
