@@ -67,7 +67,7 @@ export async function POST(request: Request) {
     await db.video.update({
       where: { id: videoId },
       data: {
-        transcriptionUrl: transcriptionBlob.url,
+        transcriptionSrc: transcriptionBlob.url,
       },
     });
 
